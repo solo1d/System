@@ -6,6 +6,8 @@ description: centos 7.6 平台
 
 ## 常会用到的命令
 
+想要查看机器代码文件的内容, 可以使用反汇编器\(objdump\).
+
 ### gcc
 
 ```bash
@@ -14,6 +16,14 @@ $gcc -Og -S mastore.c
  
 $gcc -Og -c maastore.c
     #无优化编译文件,生成.o二进制文件  mastore.o
+    
+```
+
+### objdump    反汇编器
+
+```bash
+$objdump -d mastore.o
+    #对mastore.o文件执行反汇编, 显示可执行部分的汇编内容.(输出内容: 左侧编号是地址,右侧是汇编)
 ```
 
 ### vim
@@ -27,13 +37,6 @@ $gcc -Og -c maastore.c
     指定行替换    :12,29s/work/newlink/g  (把12到29行中的 work 替换成 newlink).
     全文替换      :%s/work/newlink/g      (全文的 work 替换成 newlink).
     提示替换      :s/work/gc    (c 关键字会提示用户是否替换,上面都能使用这个选项).
-```
-
-### objdump    反汇编器
-
-```bash
-$objdump -d mastore.o
-    #对mastore.o文件执行反汇编, 显示可执行部分的会变内容
 ```
 
 
