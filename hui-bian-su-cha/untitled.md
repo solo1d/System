@@ -127,7 +127,7 @@ jbe  .L1       #同义名jna , 操作 CF | ZF     ,无符号  低于或相等 ( 
      0x3:   eb 03            jmp   8 <loop + 0x8>     #0x3 + 0x5 = 0x8 地址计算
      0x5:   48 d1 f8         sar   %rax
      0x8:   48 85 c0         test  %rax,%rax
-     0xb:   7f f8            jg    5 <loop + 0x5>     #0xf8 + 0xd = 0x5 地址计算
+     0xb:   7f f8            jg    5 <loop + 0x5>     #0xf8 + 0xd = 0x5 地址计算(补码)
      0xd:   f3 c3            repz retq                #retq返回 前面有个repz 很重要.
 ```
 
