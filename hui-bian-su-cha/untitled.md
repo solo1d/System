@@ -163,6 +163,49 @@ cmovae    S,R   同义名cmovnb , 传送条件 ~CF        , 超过或相等  ( A
 cmovb     S,R   同义名cmovnae, 传送条件 CF         , 低于 (  A < B ) 无符号
 cmovbe    S,R   同义名cmovna , 传送条件 CF | ZF    , 低于或相等  ( A <= B ) 无符号 
 
+
+例子1:
+    C代码.  long arith(long x){
+               return  x / 8;
+           }
+ 汇编代码.   x是 %rdi
+     arith
+          leaq    7(%rdi), %rax    如果被除数x是负数,那么需要加上偏置量 7 来进行运算.
+          testq   %rdi,%rdi        执行运算 x&x 然后查看条件码寄存器, 来确定下一步操作.
+          cmovns  %rdi,%rax        执行 x > 0  操作, 如果为真, 就把寄存器%rdi的值给%rax, 否则无动作.
+          sarq    $3,%rax          执行算数右移操作,移动3次,相当于 /8 操作.
+          ret
+       
+例子2:
+    C代码. long test(long x, long y){
+              long val = x * 8;
+              if( y > 0){
+                  if(x < y )
+                      val = y - x;
+                  else
+                      val = x&y;
+             }else  if( y <= -2)
+                  val = x + y;
+             return val;
+         }
+   汇编代码.  x是%rdi, y 是%rsi
+    test: 
+         leaq   0(,%rdi,8),%rax   执行 x * 8 ->%rax 操作, val = x*8;
+         testq  %rsi,%rsi         测试y的值, 修改条件码寄存器.
+         jle    .L2               测试 y<= 0  为真的时候, 跳转到 L2 处执行.
+         movq   %rsi,%rax         这里执行  if(y > 0) 处 为真的代码, 将两个值都计算出来,y ->%rax
+         subq   %rdi,%rax         执行 y - x, 将结果存入 %rax寄存器
+         movq   %rdi,%rdx         这里  x -> %rdx 
+         andq   %rsi,%rdx         执行 x&y 操作, 结果在 %rdx中
+         cmpq   %rsi,%rdi         执行减法操作, 然后重置条件码 但不修改整数寄存器. x-y
+         cmovge %rdx,%rax         执行 >= 操作, 因为上面是减法, 所以这里判断条件是 x 和 y (反转)
+         ret                          如果x-y 结果是负数,那么%rax=y-x; 否则就是 %rax=x&y;
+     .L2:
+         addq   %rsi,%rdi         这部分是 第一个if 的else 语句处, 执行了 x+y -> x
+         cmpq   $-2, %rsi         还是减法操作,重置条件码, 但不修改整数寄存器, y- (-2)
+         cmovle %rdi,%rax         执行 <= 操作, 因为上面是减法, 判断条件就是 y 和 -2, 查看条件码寄存器
+         ret                           y <= -2 操作, 这里要么上面的区分, 因为再后面没有else语句了.
+
 ```
 
 
