@@ -7,7 +7,7 @@
 ### do - while 循环
 
 ```ruby
-c格式:
+通用语句格式:
 do
      body-statement
      while (test-expr);
@@ -47,15 +47,27 @@ goto代码:
          .L2 
             imulq   %rdi,%rax    乘法运算,  result *= n
             subq    $1, %rdi     减法运算,  n-=1
-            cmpq    $1, %rdi     计算减法  n-1  设计条件码寄存器, 
-     
+            cmpq    $1, %rdi     计算减法  n-1  重置条件码寄存器, 整数寄存器%rdi并不会被修改
+            jg      .L2          判断,  n > 1 , 根据上面的条件进行判断, 如果为真, 则跳转到L2
+            rep;ret;
+```
+
+### while 循环
+
+```ruby
+通用语句格式:
+    while( test-expr )
+        body-statement
+#在第一次执行 body-statement  之前会先对 test-expr 求值.
+
+
+
+
+
+
 
 
 ```
-
-
-
-
 
 
 
