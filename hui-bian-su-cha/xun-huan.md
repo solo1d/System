@@ -60,13 +60,75 @@ goto代码:
         body-statement
 #在第一次执行 body-statement  之前会先对 test-expr 求值.
 
+翻译成goto代码:
+    t = test-expr;
+    if( !t )
+        goto done;
+    loop:
+        body-statement
+        t = test-expr;
+        if(t)
+            goto loop;
+    done:
+    
+#while有两种实现策略, 一种是 跳转到中间(使用gcc -Og), 一种是guarded-do(使用gcc -O1)
 
+C代码:
+    long fact_while(long n){
+        long result = 1;
+        while( n > 1){
+            result  *= n;
+            n = n -1;
+        }
+        return result;
+    }
+两种goto模式和对应的汇编,  跳转到中间:
+            long fact_while_jm_goto(long n ){
+                long result = 1;
+                goto test;
+              loop:
+                result *= n;
+                n = n-1;
+              test:
+                if( n > 1 )
+                    goto loop;
+                return result;
+            }
+     汇编:    n是 %rdi
+         fact_while:
+             movl    $1,%rax     设置result = 1
+             jmp     .L5          goto test
+          .L6
+             
+          
 
-
-
-
-
-
+第二种gouto模式和对应汇编, guarded-do :
+            long fact_while_gd_goto(long n ){
+               long result = 1;
+               if( n <= 1)        /* 这个判断很重要 */
+                  goto done;
+            loop:
+               result *= n;
+               n = n-1;
+               if( n!= 1 )
+                   goto loop;
+            done:
+                return result;
+            }
+     汇编:    n是 %rdi
+          fact_while:
+              cmpq    $1,%rdi     对比 n-1
+              jle     .L7         if  n<=1  goto 到 done
+              movl    $1,%rax     设置 result =1
+          .L6:                    这里是 loop:
+              imulq   %rdi,%rax   乘法 result*=n;
+              subq    $1,%rdi     n递减
+              cmpq    $1,%rdi     对比 n-1
+              jne     .L6         if n!= 1
+              rep;ret
+          .L7:
+              movl    $1,%rax
+              ret
 ```
 
 

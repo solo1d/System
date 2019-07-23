@@ -116,6 +116,7 @@ jbe  .L1       #同义名jna , 操作 CF | ZF     ,无符号  低于或相等 ( 
 
 # repz retp  指令的组合很重要,可以加快处理速度.只可以出现在 跳转指令之后,函数的最后两条指令.
 例子
+ loop:
     movq   %rdi, %rax       
     jmp    .L2            无条件跳转到L2
  .L3:
@@ -128,10 +129,10 @@ jbe  .L1       #同义名jna , 操作 CF | ZF     ,无符号  低于或相等 ( 
 详细解析 十六进制反汇编:  (PC 值很重要,它指向下条指令的地址)
      地址   十六进制机器代码    指令   操作数
      0x0:   48 89 f8         mov   %rdi,%rax
-     0x3:   eb 03            jmp   8 <loop + 0x8>     #0x3 + 0x5 = 0x8 地址计算
+     0x3:   eb 03            jmp   8 <loop + 0x8>     #0x3 + 0x5 = 0x8 地址计算,或者loop+8
      0x5:   48 d1 f8         sar   %rax
      0x8:   48 85 c0         test  %rax,%rax
-     0xb:   7f f8            jg    5 <loop + 0x5>     #0xf8 + 0xd = 0x5 地址计算(补码)
+     0xb:   7f f8            jg    5 <loop + 0x5>     #0xf8 + 0xd = 0x5 地址计算(补码),或者loop+5
      0xd:   f3 c3            repz retq                #retq返回 前面有个repz 很重要.
 ```
 
