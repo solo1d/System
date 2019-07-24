@@ -1,4 +1,4 @@
-# 循环
+# 循环 和 switch
 
 ## 循环
 
@@ -131,9 +131,104 @@ C代码:
               ret
 ```
 
+### for 循环
+
+```ruby
+for基本格式:
+for(init-expr; test-expr; update-expr)
+      body-statement;
+
+
+有基于 while 两种模式的转换, 取决于优化等级.
+跳转中间策略:  gcc -S -O1
+    init-expr;
+    goto  test;
+ loop:
+    body-statement
+    update-expr;
+ test:
+    t = test-expr;
+    if(t)
+       goto loop;
+
+而guarded-do 策略:  gcc -S -Og
+   init-expr;
+   t = test-expr;
+   if(!t)
+      goto done;
+loop:
+   body-statement;
+   update-expr;
+   t = test-expr;
+   if(t)
+      goto loop;
+done:
+
+
+最根本的操作还是将for 转换成 while , 然后再转换汇编代码.
+
+C 代码:
+   long fact_for(long n ){
+      long i ;
+      long restult = 1;
+      for(i = 2; i <= n; i++)
+         restult *= i;
+      return result;
+   }
+
+翻译成 while 代码:
+    long fact_while(long n ){
+       long i =2;
+       long result = 1;
+       while( i <= n){
+          result *= i;
+          i++;
+       }
+       return result;
+    }
+
+GOTO 代码 的一种翻译形式:  跳转到中间形式.
+   long fact_goto(long n ){
+      long i = 2;
+      long result = 1;
+      goto test;
+   loop:
+      result *= i;
+      i++;
+   test:
+      if( i <= n )
+         goto loop;
+      return result;
+   }
+   
+翻译成汇编代码:
+   n是 %rdi
+      fact_for:
+         movl   $1,%eax
+         movl   $2,%edx
+         jmp    .L8
+      .L7:
+         imulq   %rdx,%rax
+         addq    $1,%rdx
+      .L8:
+         cmpq    %rdi,%rdx
+         jle     .L9
+         rep;ret
+```
+
+## switch  整数索引值进行多重分支
+
+```ruby
+switch是通过跳转表数组来实现的, 它的效率比if-else 嵌套要高.
+ 运算符  &&  是指向代码位置的指针 ( 不是 并且运算 ).
 
 
 
+
+
+
+
+```
 
 
 
