@@ -21,5 +21,7 @@ C代码:
         je       .L2
         shrq     $2, %rax
     .L2
+        popq     %rbx
+        ret
 ```
 
