@@ -9,6 +9,8 @@
   * [过程 \(栈,局部变量,局部存储空间\)](hui-bian-su-cha/guo-cheng.md)
   * [递归过程](hui-bian-su-cha/di-gui-guo-cheng.md)
   * [数组分配和访问](hui-bian-su-cha/shu-zu-fen-pei-he-fang-wen.md)
+  * [异质的数据结构: 结构struct,联合union](hui-bian-su-cha/yi-zhi-de-shu-ju-jie-gou-jie-gou-struct-lian-he-union.md)
+  * [数据对齐](hui-bian-su-cha/shu-ju-dui-qi.md)
   * [在C程序中插入汇编的两种方法](hui-bian-su-cha/zaiccheng-xu-zhong-cha-ru-hui-bian-de-liang-zhong-fang-fa.md)
   * [intel 和 ATT 格式的不同](hui-bian-su-cha/intel-he-att-ge-shi-de-bu-tong.md)
 
