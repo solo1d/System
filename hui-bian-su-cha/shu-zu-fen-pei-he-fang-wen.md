@@ -88,9 +88,83 @@ C 语言允许对指针进行运算, 而计算出来的值会根据该指针引�
 
 定长数组的变化和运算方法与嵌套数组计算公式相同. 需要注意数据类型的字节数.
 
+```ruby
+#下面的代码将定长数组的对角线上的元素设置为 val;
+
+    #default  N  16
+
+    void fix_set_diag(int A[N][N], int val){
+        long i;
+        for(i=0; i<N; i++)
+            A[i][i] = val;
+    }
+
+经过 gcc -O1 优化之后, 而生成的C 代码:
+    void fix_set_diag(int A[N][N], int val){
+        int* p = A[0];  /* 等价于 int* p =  &A[0][0]; */
+        long i = 0;
+        long n = N*(N+1);
+        do{
+            p[i] = val;
+            i += (N+1);
+            }while ( i != n );    }
+
+生成的汇编代码:    A是%rdi,  val是%rsi
+    fix_set_diag:
+        movl     $0,%eax               i = 0
+    .L13:
+        movl     %esi, (%rdi, %rax)    val的值给到 A+i 的内存地址中
+        addq     $68,%rax              i自增, N=16, int是4字节, 4*(16+1) = 4*17= 68 ;
+        cmpq     $1088,%rax            i!=1088, 4*(16*(16+1)) = 1088, 实际已经越界了.
+        jne      .L13                   !=
+        rep;ret
+```
 
 
 
+### 变长数组
+
+C语言只支持大小在编译时就能确定的多维数组.
+
+变长数组指的是在参数中传递局部变量\(或者表达式\)来作为一个多维数组的维度.
+
+用行优先索引将多维数组映射到一维数组.
+
+```ruby
+以下代码适用于 支持变长数组的 ISO C99标准
+    计算两个 n*n 矩阵 A 和 B 乘积的元素i,k
+原始C代码:
+    int var_prod_ele(long n, int A[n][n], int B[n][n], long i, long k){  /* n这个参数*/
+        long j ;
+        int result = 0;
+        for( j=0; j<n ;j++){
+            result += A[i][j] * B[j][k];
+        return result;
+    }
+编译器优化后的 C 代码:
+    int var_prod_ele(long n, int A[n][n], int B[n][n], long i, long k){
+        int *Arow = A[i];    
+        int *Bptr = %B[0][k];
+        int result = 0;
+        long j ;
+        for( j=0; j<n; j++){
+            result += Arow[j] * (*Bptr);
+            Bptr += n;
+        }
+        return result;
+    }
+汇编代码:    n是%rdi, Arow是%rsi, Bptr是%rcx, 4n是%r9, result是%eax, j是%edx
+    .L24
+        movl    (%rsi,%rdx,4),%r8d    读取Arow[j] 的值, 可以看成是一维数组
+        imull   (%rcx),%r8d           乘法运算,Bptr指针指向的值 乘 Arow[j] 的值
+        addl    %r8d,%rax             将上面的 A[i][0] * B[0][k] 的结果写入 result
+        addq    $1,%rdx               j+1
+        addq    %r9,%rcx              Bptr+ (4*n), 得到下一行的 B[0][K+1] 的地址
+        cmpq    %rdi,%rdx             j != n
+        jne    .L24
+
+
+```
 
 
 
