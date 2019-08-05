@@ -28,15 +28,27 @@ void echo(){
     gits(buf):
     push(buf);
 }
+
+
+
+
+/* echo 函数 所产生的汇编代码, 实际给buf 分了8个字节空间, 但是又预留了8个, 总共16字节空间 */
+echo:
+    subq     $24,%rsp        申请24 个字节的栈空间,8个是返回值,8个来存放buf,和8个未使用的空间.
+    movq     %rsp,%rdi       将char buf 的地址当作参数传入 gets 函数
+    call     gets            调用gets 函数
+    movq     %rsp,%rdi       同上
+    call     puts            同上
+    add      $24,%rsp        释放栈空间
+    ret
 ```
 
+![&#x5F53;buf &#x5B58;&#x50A8;&#x7684;&#x5185;&#x5BB9;&#x8D85;&#x8FC7;7&#x4E2A;&#x65F6;&#x7684;&#x72B6;&#x6001;](../.gitbook/assets/ping-mu-kuai-zhao-20190805-17.37.14.png)
 
-
-
-
-
-
-
+* 0 ~ 7      **`不会有影响`**
+* 9 ~ 23    **`会覆盖未被使用的预留8字节的空间, 但是无法读取出来.`**
+* 24 ~ 31  **`会覆盖call 调用的时候所保存的 %rip 寄存器(PC), echo函数的返回地址`**
+* 32 +        **`会覆盖 caller(栈帧)中保存的状态, 后果非常严重.`**
 
 
 
