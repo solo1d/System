@@ -13,6 +13,7 @@
   * [数据对齐 和指针](hui-bian-su-cha/shu-ju-dui-qi.md)
   * [GDB](hui-bian-su-cha/gdb.md)
   * [内存越界引用和缓冲区溢出](hui-bian-su-cha/nei-cun-yue-yin-yong-he-huan-chong-qu-yi-chu.md)
+  * [变长栈帧](hui-bian-su-cha/bian-chang-zhan-zhen.md)
   * [在C程序中插入汇编的两种方法](hui-bian-su-cha/zaiccheng-xu-zhong-cha-ru-hui-bian-de-liang-zhong-fang-fa.md)
   * [intel 和 ATT 格式的不同](hui-bian-su-cha/intel-he-att-ge-shi-de-bu-tong.md)
 
