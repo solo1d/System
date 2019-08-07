@@ -42,6 +42,9 @@ vframe:
    shrq     $3,%rax
    leaq     0(,%rax,8),%r8     以上计算将求得离得最近的8数 即&p[0]，并出入%r8中
    movq     %r8,%rcx           %rcx=p
+ 
+  ## 代码执行到这里之后,寄存器的值会有所变化
+  ## i是%rax(在栈内),n是%rdi,p是%rcx,q是%rdx
 .L3:
    movq       %rdx,(%rcx,%rax,8)       将p[i]的值设为q
    addq       $1,%rax                  i++
@@ -50,6 +53,9 @@ vframe:
    movq       -8(%rdp),%rax            获取i值
    cmpq        %rdi,%rax               对比i值和n值
    jl          .L3                     如果小于则跳转L3
+   
+   leave       #这条指令相当于执行了  movq %rbp,%rsp  和 popq %rbp  这两条指令.
+   ret
 ```
 
 ![&#x6808;&#x7A7A;&#x95F4;&#x56FE;](../.gitbook/assets/ping-mu-kuai-zhao-20190807-11.03.37.png)
