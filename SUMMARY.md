@@ -1,6 +1,7 @@
 # Table of contents
 
 * [Linux 系统笔记](README.md)
+* [IEEE 规格化与非规格化浮点数运算法则](ieee-gui-ge-hua-yu-fei-gui-ge-hua-fu-dian-shu-yun-suan-fa-ze.md)
 * [x86汇编,寄存器](hui-bian-su-cha/README.md)
   * [x86汇编 算数和逻辑操作指令](hui-bian-su-cha/x86-hui-bian-ji-suan-zhi-ling.md)
   * [x86汇编 条件码指令, 跳转指令](hui-bian-su-cha/untitled.md)
@@ -14,7 +15,9 @@
   * [GDB](hui-bian-su-cha/gdb.md)
   * [内存越界引用和缓冲区溢出](hui-bian-su-cha/nei-cun-yue-yin-yong-he-huan-chong-qu-yi-chu.md)
   * [变长栈帧](hui-bian-su-cha/bian-chang-zhan-zhen.md)
-  * [浮点代码](hui-bian-su-cha/fu-dian-dai-ma.md)
+  * [浮点代码, 浮点传送和转换操作](hui-bian-su-cha/fu-dian-dai-ma.md)
+  * [浮点数初始化和运算指令](hui-bian-su-cha/guo-cheng-zhong-de-fu-dian-dai-ma.md)
   * [在C程序中插入汇编的两种方法](hui-bian-su-cha/zaiccheng-xu-zhong-cha-ru-hui-bian-de-liang-zhong-fang-fa.md)
   * [intel 和 ATT 格式的不同](hui-bian-su-cha/intel-he-att-ge-shi-de-bu-tong.md)
+* [计算机体系结构](ji-suan-ji-ti-xi-jie-gou.md)
 

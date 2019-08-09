@@ -1,4 +1,4 @@
-# 浮点代码
+# 浮点代码, 浮点传送和转换操作
 
 ## 浮点代码
 
@@ -45,13 +45,115 @@ AVX 浮点体系结构允许数据存储在 **16个 YMM** 寄存器中, 他们�
 
 内存引用的制定方式与MOV 指令相同.
 
-![&#x6D6E;&#x70B9;&#x4F20;&#x9001;&#x6307;&#x4EE4;](../.gitbook/assets/ping-mu-kuai-zhao-20190807-12.26.38.png)
+#### 所有带有字母 a 的指令,在写入内存时, 内存地址必须保证 16字节 对齐,否则会导致异常.
+
+### 浮点数出传送指令
+
+```ruby
+浮点传送指令  :  接受浮点数的寄存器是 %xmm0 ~ %xmm15 这十六个128位寄存器(64*2 或 32*4)
+vmovss    32位内存或浮点寄存器,32位内存或浮点寄存器    #传输单精度浮点数(32位),内到寄,或寄到内
+vmovsd    64位内存或浮点寄存器,64位内存或浮点寄存器    #传输双精度浮点数(64位),内到寄,或寄到内
+vmovaps   浮点寄存器,浮点寄存器       #传送对齐的封装好的单精度数(32), 从寄存器到寄存器
+vmovapd   浮点寄存器,浮点寄存器       #传送对齐的封装好的双精度数(64), 从寄存器到寄存器
+
+示例:
+  C代码:
+    float float_mov(float v1, float *src, float *dst){
+        float  v2 = *src;
+        *dst   = v1;
+        return = v2;
+    }
+ 汇编代码:  v1是%xmm0, src是%rdi, dst是%rsi  ##注意,第一个参数是浮点数寄存器不同
+  float_mov:
+      vmovaps   %xmm0,%xmm1    将v1的值保存起来,因为返回值是v2,所以%xmm0 应该存储v2
+      vmovss    (%rdi),%xmm0   读取src指向在内存中的值,然后存入%xmm0寄存器( v2)
+      vmovss    %xmm1,(%rsi)   将v1的值传递到内存, v1 -> %dst
+      ret                      将%xmm0 寄存器作为返回值,传递出去.
+```
+
+### 浮点数到整数的转换指令
+
+```ruby
+浮点数转换成整数时,指令会执行 截断,把值向0进行舍入. (就是完全抛弃小数部分,没有进位)
+
+vcvttss2si   32位内存或浮点寄存器,32位通用寄存器     #把单精度浮点数转换成4字节整数 float -> int
+vcvttsd2si   64位内存或浮点寄存器,64位通用寄存器     #把双精度浮点数转换成4字节整数 double-> int
+vcvttss2siq  32位内存或浮点寄存器,64位通用寄存器     #把单精度浮点数转换成8字节整数 float -> long
+vcvttsd2siq  64位内存或浮点寄存器,64位通用寄存器     #把双精度浮点数转换成8字节整数 double-> long
+```
+
+### 整数到浮点数的转换指令
+
+```ruby
+第一个参数是整数(源), 第二个与第三个相同都是目的寄存器(目标)
+vcvtsi2ss   32位内存或32位通用寄存器,浮点寄存器,浮点寄存器   #4字节整数转换成单精度浮点数 int ->float
+vcvtsi2sd   32位内存或32位通用寄存器,浮点寄存器,浮点寄存器   #4字节整数转换成双精度浮点数 int ->double
+vcvtsi2ssq  64位内存或64位通用寄存器,浮点寄存器,浮点寄存器   #8字节整数转换成单精度浮点数 long->float
+vcvtsi2sdq  64位内存或64位通用寄存器,浮点寄存器,浮点寄存器   #8字节整数转换成双精度浮点数 long->double
+
+例子:  
+    vcvtsi2sdq   %rax,%xmm1,%xmm1    
+            #从寄存器%rax读取长整型 long,把它转换成双精度double 存入%xmm1寄存器低8字节.
+```
+
+### 单/双 精度数互转指令
+
+```ruby
+以下两条指令可以执行
+         单精度转双精度
+      
+vunpcklps    %xmm0,%xmm0,%xmm0
+    #交叉前两个寄存器的值,放入第三个寄存器, 假设%xmm0[s3,s2,s1,s0], 经过交叉之后结果如下
+    #    %xmm0 的值会被更新位 [s1,s1,s0,s0], 其余的被丢弃扔了(每个值都是4字节,共128位)
+vcvtps2pd    %xmm0,%xmm0
+    #经过上面的交叉, 这里把%xmm0的值进行拓展,变成双精度 
+    # %xmmm[s1,s1,s0,s0] 变成了  [ds0,ds0]  (ds0占8字节,共2*8=16字节,共128位)
+    #    [s1] 还是被丢弃了
+
+目前最新的指令   单精度转双精度 ( 一条指令就可以完成转换 )
+    vcvtss2sd	%xmm0, %xmm0, %xmm0         #指令的 ss表示单精度,sd表示双精度
+    
 
 
 
+以下两条指令可以执行
+        双精度转单精度
+vmovddup    %xmm0,%xmm0 
+    #假设%xmm0存储值为[x1,x0]两个双精度数(8字节),这条指令会把它变成 [x0,x0] 两个双精度数
+vcvtpd2psx  %xmm0,%xmm0
+    #这条指令会把%xmm0[x0,x0]两个双精度(8字节) 转换成单精度(4字节),并放到寄存器的低位一半
+    # 中,并将高位一半设置为0, 结果得到 %xmm0[0.0, 0.0, x0,x0],这时候x0占4字节
+
+
+目前最新的指令   双精度转单精度( 一条指令就可以完成转换 )
+    vcvtsd2ss  %xmm0,%xmm0,%xmm0         #指令的 ss表示单精度,sd表示双精度
 
 
 
+示例:
+ C代码:
+    double fcvt(int i,float *fp, double *dp,long *lp){
+          float f = *fp;     double d = *dp;      long l = *lp;
+          *lp = (long)   d;   /* double -> long   双精度转8字节整数*/
+          *fp = (float)  i;   /* int  -> float   4字节整数转单精度*/
+          *dp = (double) l;   /* long -> double  8字节整数转双精度*/
+          retunr (double) f;  /* float -> double 单精度转双精度*/
+
+  汇编代码: i是%edi,  fp是%rsi,  dp是%rdx, lp是%rcx
+    fcvt:
+      vmovss    (%rsi),%xmm0          #传送单精度的 *fp 到 f  (f是返回值)
+      movq      (%rcx),%rax           #取出*lp 的值到%rax , long值 lp被取出暂存.
+      vcttsd2siq   (%rdx),%r8         #双精度double d 转8字节整数, 临时存放到%r8
+      movq      %r8,(%rcx)            #将%r8 的8字节整数传送给  lp(long)内存中
+      vcvtsiss  %edi,%xmm1,%xmm1      #32整数i 转换成单精度,临时存入 %xmm1
+      vmovss    %xmm1,(%rsi)          #单精度传送指令, %xmm1 放入到内存 i-> *fp
+      vcvtsi2sdq   %rax,%xmm1,%xmm1   #8字节整数转浮点, lp备份值被转成 double
+      vmovsd    %xmm1,(%rdx)          #双精度浮点数存入内存  l -> *dp
+               #从这里开始就是返回值计算,将从 *fp 取出的值由单精度转双精度
+      vunpcklps    %xmm0,%xmm0,%xmm0  #交叉值,高位剔除,低位堆叠 [x1,x1,x0,x0]
+      vcvtps2pd    %xmm0,%xmm0        #将单进度进行拓展,变成双精度 [x0,x0]
+      ret                             # %xmm0 被当作返回值 进行返回.
+```
 
 
 
