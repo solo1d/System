@@ -19,5 +19,6 @@
   * [浮点数初始化和运算指令](hui-bian-su-cha/guo-cheng-zhong-de-fu-dian-dai-ma.md)
   * [在C程序中插入汇编的两种方法](hui-bian-su-cha/zaiccheng-xu-zhong-cha-ru-hui-bian-de-liang-zhong-fang-fa.md)
   * [intel 和 ATT 格式的不同](hui-bian-su-cha/intel-he-att-ge-shi-de-bu-tong.md)
-* [计算机体系结构](ji-suan-ji-ti-xi-jie-gou.md)
+* [处理器体系结构](ji-suan-ji-ti-xi-jie-gou/README.md)
+  * [Y86-64 指令集体系结构](ji-suan-ji-ti-xi-jie-gou/y8664-zhi-ling-ji-ti-xi-jie-gou.md)
 
