@@ -239,3 +239,9 @@ sum:                           sum:
 
 ![YIS&#x6307;&#x4EE4;&#x96C6;&#x6A21;&#x62DF;&#x5668;](../.gitbook/assets/ping-mu-kuai-zhao-20190811-16.40.03.png)
 
+## push和pop , %rsp指针时需要注意的内容
+
+**当出现  `pushq  %rsp`  指令时, %rsp 寄存器的值会先入栈, 然后再自减 8. 完成栈的位移;**
+
+**当出现 `popq  %rsp`   指令时, %rsp 寄存器会先加上8, 然后再把栈中的值取出来覆盖掉 %rsp这个目的寄存器的内容.**
+

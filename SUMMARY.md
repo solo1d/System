@@ -21,4 +21,5 @@
   * [intel 和 ATT 格式的不同](hui-bian-su-cha/intel-he-att-ge-shi-de-bu-tong.md)
 * [处理器体系结构](ji-suan-ji-ti-xi-jie-gou/README.md)
   * [Y86-64 指令集体系结构,指令和编码以及异常结构](ji-suan-ji-ti-xi-jie-gou/y8664-zhi-ling-ji-ti-xi-jie-gou.md)
+  * [逻辑设计和硬件控制语言 HCL](ji-suan-ji-ti-xi-jie-gou/luo-ji-she-ji-he-ying-jian-kong-zhi-yu-yan-hcl.md)
 
