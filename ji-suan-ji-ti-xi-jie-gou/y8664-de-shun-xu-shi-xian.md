@@ -32,9 +32,21 @@
 
 **整数操作指令的处理遵循上面列出的通用模式.**
 
-**`OP代表ifun 指定的操作.`**
+**`OP代表ifun 指定的操作 (addq ,subq, andq, xorq).`**
+
+**`执行rrmovq 指令和执行算术运算类似, 不过不需要取第二个寄存器操作数, 我们将ALU 的第二个输入设为0, 先把它和第一个操作数相加,得到 valE = valA, 然后再把这个值写到寄存器文件. 对 irmovq的处理与此类似,除了ALU的第一个输入为常数值 valC. 另外,因为长指令格式, 对于irmovq, 程序计数器必须加10. 所有这些指令都不改变条件码.`**
 
 ![subq&#x6267;&#x884C;&#x8FC7;&#x7A0B; ,  %rdx=9,%rbx=12,&#x6307;&#x4EE4;&#x5730;&#x5740;0x014](../.gitbook/assets/ping-mu-kuai-zhao-20190813-17.32.48.png)
+
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.18.31.png)
+
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.19.08.png)
+
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.40.57.png)
+
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.41.34.png)
+
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.41.53.png)
 
 
 
