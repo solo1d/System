@@ -36,33 +36,33 @@
 
 **`执行rrmovq 指令和执行算术运算类似, 不过不需要取第二个寄存器操作数, 我们将ALU 的第二个输入设为0, 先把它和第一个操作数相加,得到 valE = valA, 然后再把这个值写到寄存器文件. 对 irmovq的处理与此类似,除了ALU的第一个输入为常数值 valC. 另外,因为长指令格式, 对于irmovq, 程序计数器必须加10. 所有这些指令都不改变条件码.`**
 
-![subq&#x6267;&#x884C;&#x8FC7;&#x7A0B; ,  %rdx=9,%rbx=12,&#x6307;&#x4EE4;&#x5730;&#x5740;0x014](../.gitbook/assets/ping-mu-kuai-zhao-20190813-17.32.48.png)
+### 指令序列示例
 
-![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.18.31.png)
+![&#x662F;&#x4E00;&#x4E2A;&#x793A;&#x4F8B;&#x7A0B;&#x5E8F;, &#x4F9B;&#x4E0B;&#x56FE;&#x8BE6;&#x89E3;](../.gitbook/assets/screen-shot-2019-08-14-at-1.25.39-pm.png)
 
-![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.19.08.png)
+### \(sub,add,and,xor\)  rrmovq,  irmovq   顺序计算实现
 
-![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.40.57.png)
+![&#x987A;&#x5E8F;&#x8BA1;&#x7B97;&#x5B9E;&#x73B0;](../.gitbook/assets/screen-shot-2019-08-14-at-6.24.36-pm.png)
 
-![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.41.34.png)
+![&#x5177;&#x4F53;&#x6848;&#x4F8B;, &#x662F;&#x793A;&#x4F8B;&#x56FE;&#x7684; &#x7B2C;3&#x884C;&#x4E2D; subq &#x6307;&#x4EE4;](../.gitbook/assets/screen-shot-2019-08-14-at-6.30.48-pm.png)
 
-![](../.gitbook/assets/ping-mu-kuai-zhao-20190813-19.41.53.png)
+### rmmovq,  mrmovq  顺序计算实现
 
+![](../.gitbook/assets/screen-shot-2019-08-14-at-6.32.20-pm.png)
 
+![&#x793A;&#x4F8B;&#x56FE;, &#x7B2C;5&#x884C;](../.gitbook/assets/screen-shot-2019-08-14-at-6.36.36-pm.png)
 
+### pushq  , popq  顺序实现
 
+![](../.gitbook/assets/screen-shot-2019-08-14-at-6.41.12-pm.png)
 
+![&#x793A;&#x4F8B;&#x56FE;, &#x7B2C;6&#x884C;](../.gitbook/assets/screen-shot-2019-08-14-at-6.42.41-pm.png)
 
+###  call  ,ret,  jXX\(jmp,jne.....\)  三类控制转移指令
 
+![](../.gitbook/assets/screen-shot-2019-08-14-at-6.44.44-pm.png)
 
+![&#x793A;&#x4F8B;&#x56FE;, &#x7B2C;8&#x884C;](../.gitbook/assets/screen-shot-2019-08-14-at-6.49.28-pm.png)
 
-
-
-
-
-
-
-
-
-
+![&#x793A;&#x4F8B;&#x56FE;, &#x7B2C;13&#x884C;](../.gitbook/assets/screen-shot-2019-08-14-at-6.50.29-pm.png)
 
