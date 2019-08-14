@@ -60,7 +60,7 @@
 
 ###  call  ,ret,  jXX\(jmp,jne.....\)  三类控制转移指令
 
-![](../.gitbook/assets/screen-shot-2019-08-14-at-6.44.44-pm.png)
+![cnd &#x662F;&#x5206;&#x652F;&#x4FE1;&#x53F7;](../.gitbook/assets/screen-shot-2019-08-14-at-6.44.44-pm.png)
 
 ![&#x793A;&#x4F8B;&#x56FE;, &#x7B2C;8&#x884C;](../.gitbook/assets/screen-shot-2019-08-14-at-6.49.28-pm.png)
 
