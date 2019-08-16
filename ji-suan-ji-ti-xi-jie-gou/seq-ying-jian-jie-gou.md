@@ -105,7 +105,7 @@ nop    指令只是简单的经过各个阶段, 除了要将PC 加一,不进行�
 halt   指令是的处理器状态被设置为 HLT, 导致处理器停止运行.
 ```
 
-### 取指阶段
+### 1. 取指阶段
 
 ![&#x53D6;&#x6307;&#x9636;&#x6BB5;](../.gitbook/assets/screen-shot-2019-08-15-at-6.49.41-pm.png)
 
@@ -137,8 +137,69 @@ $$
 PC值 = p + 1 + r +8i
 $$
 
-### 译码 和 写回阶段
+### 2. 译码 和 写回阶段
 
+**译码和写回都需要访问寄存器文件.**
+
+![](../.gitbook/assets/screen-shot-2019-08-16-at-10.47.15-am.png)
+
+* 寄存器文件有4个端口, 每个端口都有一个**地址连接**\(**`寄存器ID`**\)和一个**数据连接**\(**`一组64根线路`**\)
+  * **两个读端口 \( A 和 B  \)**    
+    * 地址分别是  **`srcA`**   和 **`srcB`**
+      * **`srcA 和 srcB  表示该读那个寄存器以产生 valA  和 valB.`** 
+        * **`srcA 的 HCL 描述:`**
+          * `word srcA = [  icode in {IRRMOVQ , IRMMOVQ, IOPQ, IPUSHQ } : rA; icode in {IPOPQ, IRET} : RRSP;      1:RNONE;#最后这个表示不需要访问寄存器  ]`
+        * **`srcB 的 HCL 描述:`**
+          * `word  srcB = [ icode in {IOPQ , IRMMOVQ, IMRMOVQ } : rB;    icode in {IPUSHQ , IPOPQ, ICALL, IRET } : RRSP;    1 : RNONE; ]`
+  * **两个写端口 \( E 和 M \),  只有  popq 指令会同时用到寄存器文件的两个写端口.**
+    * 地址分别是 `dstE`  和 `dstM`,  **优先级 valE先写入,valM后写入, 但是 valE的值有可能会被valM覆盖 \( `popq %rsp` \)**
+      * `word dstE = [  icode in { IRRMOVQ } : rB;  icode in { IIRMOVQ, IOPQ }:rB;  icode in { IPUSHQ, IPOPQ, ICALL, IRET } : RRSP ;   1:RNONE;  ]`
+      * * `word dstM = [  icode in { IMRMOVQ, IPOPQ , } :rA;    1:RNONE;  ]`
+  * 如果某个地址端上的值为特殊标识符  **0xF**\(**RNONE**\), 则表明**不需要访问寄存器**
+
+根据指令代码  **`icode`** 以及寄存器指示值 **`rA`** 和 **`rB`** ,可能会根据执行阶段计算出 **`Cnd 条件信号`**,
+
+**图中 底部的 四个块\(dstE,dstM,srcA,srcB\) 产生出四个不同的寄存器文件的寄存器ID.**
+
+### 3. 执行阶段
+
+![ALU](../.gitbook/assets/screen-shot-2019-08-16-at-2.10.47-pm.png)
+
+执行阶段包括算术/逻辑单元\( ALU \). 这个单元根据 alufun 信号的设置,对输入 aluA 和 aluB 执行 ADD ,SUBTRACT ,AND 或 EXCLUSIVE-OR运算.
+
+这些数据和控制信号是由三个控制块产生的\(ALUfun.   ALUA, LUAB\),  ALU的输出就是valE 信号\(值\).
+
+* 执行阶段的第一步就是每条指令的 ALU 计算.
+  * 列出操作数 aluB 在前面, aluA 在后面, 这样做是为了保证 subq 指令是 valB减去valA
+  * 根据指令类型, aluA 的值可以是 valA , valC , 或者是 -8 或+8.
+  * aluA的控制块行为:
+    * `word aluA = [  icode in { IRRMOVQ, IOPQ } : valA;          icode in { IIRMOVQ, IRMMOVQ, IMRMOVQ } : valC;          icode in { ICAL , IPUSHQ } : -8;     icode in { IRET,  IPOPQ } :8;         ]`
+* **ALU在执行阶段执行的操作**
+  * 每次运行 ALU 都会产生三个与条件码相关的信号  - 零,符号和溢出.
+    * 但是只能在执行 OPq 指令时才设置条件码.  因此产生了一个信号 set\_cc 来控制是否更新条件码
+      * `bool  set_cc = icode in { IOPQ };`
+* 标号为  “cond“  的硬件单元会根据条件码和功能码来确定是否进行条件分支或者条件数据传送.
+  * 他产生信号 Cnd ,  用于设置条件传送 dstE ,也用于田间分支的下一个 PC 逻辑中.
+  * 对于其他指令, 取决于指令的功能码和条件码的设置,  Cnd 信号可以被设置为1或者0
+    * 但是控制逻辑会忽略它.
+
+### 4. 访存阶段
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 
 
 
