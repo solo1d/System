@@ -183,30 +183,76 @@ $$
   * 对于其他指令, 取决于指令的功能码和条件码的设置,  Cnd 信号可以被设置为1或者0
     * 但是控制逻辑会忽略它.
 
+```text
+条件传送
+word  dstE = [
+    icode in { IRMMOVQ, IMRMOVQ, IOPQ, ICALL , IPUSHQ, IRET , IPOPQ } :valB;
+    icode in { IRRMOVQ, IIRMOVQ } 0;
+]
+```
+
 ### 4. 访存阶段
 
+**访存阶段的任务 就是读或写程序数据.**
 
+![](../.gitbook/assets/screen-shot-2019-08-16-at-4.43.29-pm.png)
 
+**两个控制块\(`Mem.addr, Mem.data`\)产生内存地址和内存输入数据\(为写操作\)的值.**
 
+**另外两块 \( `Mem.read, Mem.write` \) 产生表明应该执行读操作还是写操作的控制信号.\(当执行读操作时, 数据内存产生值 `valM` \).**
 
+**内存地和写的地址总是 valE 或 valA.**  
 
+```text
+HCL 描述:
+word mem_addr = [
+        icode in  { IRMMOVQ, IPUSHQ, ICALL, IMRMOVQ } : valE;
+        icode in  { IPOPQ , IRET } :valA;
+];
 
+word  mem_data = [
+        icode in { IRMMOVQ, IPUSHQ } :valA;
+        icode  == ICALL : valP;
+]
 
+从内存中读数据 并设置控制信号 mem_read
+bool mem_read = icode in { IMRMOVQ, IPOPQ, IRET };
 
+向内存写数据的指令并设置控制信号 mem_write
+bool mem_write = icode in { IRMMOVQ, IPUSH, ICALL } ;
 
+访存阶段的最后功能是根据取指阶段产生的 icode, imem_error(地址不合法,1不合法,0合法),
+    instr_valid(指令不合法,0不合法,1合法)值,以及数据内存产生的dmem_error(1不合法,0合法)信号,
+        从指令执行的结果来计算状态码 Stat
+word Stat = [
+        imem_error || dmem_error : SADR;
+        !instr_valid : SINS;
+        icode == IHALT : SHLT;
+        1 : SAOK;
+]
+```
 
+## 5. 更新PC阶段
 
+![](../.gitbook/assets/screen-shot-2019-08-16-at-5.03.52-pm.png)
 
+SEQ 中最后一个阶段产生程序计数器的新值.
 
+**根据指令的类型和是否要选择分支, 新的PC可能是 valC,  valM 或 valP.**
 
-  
+```text
+word   new_pc  = [
+    icode == ICALL :valC;
+    icode == IJXX && Cnd : valC;
+    icode == IRET : valM;
+]
+```
 
+### 6. 小结
 
+**可以用各种硬件单元以及一个时钟来控制计算的顺序, 从而实现整个处理器.**
 
+**SEQ唯一的问题就是它太慢了, 时钟必须非常慢, 以使信号能在一个周期内传播所有的阶段.**
 
-
-
-
-
-
+**这种方法不能充分利用硬件单元, 因为每个单元只在整个时钟周期的一部分时间内才被使用.\( 可以引用流水线来获得更好的性能\)**
 

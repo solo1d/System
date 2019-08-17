@@ -25,4 +25,5 @@
   * [存储器和时钟](ji-suan-ji-ti-xi-jie-gou/cun-chu-qi-he-shi-zhong.md)
   * [Y86-64 的顺序实现](ji-suan-ji-ti-xi-jie-gou/y8664-de-shun-xu-shi-xian.md)
   * [SEQ 硬件结构](ji-suan-ji-ti-xi-jie-gou/seq-ying-jian-jie-gou.md)
+  * [流水线](ji-suan-ji-ti-xi-jie-gou/liu-shui-xian.md)
 
