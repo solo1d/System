@@ -27,4 +27,5 @@
   * [SEQ 硬件结构](ji-suan-ji-ti-xi-jie-gou/seq-ying-jian-jie-gou.md)
   * [流水线](ji-suan-ji-ti-xi-jie-gou/liu-shui-xian.md)
 * [优化程序性能](you-hua-cheng-xu-xing-neng.md)
+* [存储器层次结构](cun-chu-qi-ceng-ci-jie-gou.md)
 
