@@ -28,7 +28,7 @@
 * 超单元 \(字节\)  d 
   * 每个超单元都由 w 个DRAM单元组成,\(一般是8个\)
 
-![](.gitbook/assets/ping-mu-kuai-zhao-20190823-shang-wu-11.44.22.png)
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190823-shang-wu-11.44.22.png)
 
 ## 磁盘容量计算
 
@@ -64,7 +64,7 @@ $$
     * 一个扇区的传送时间依赖于旋转速度和每条磁道的扇区数目.
       *  **`T avg transfer  = 1/RPM   *  1/(平均扇区数/磁道)  * 60s/1min`**
 
-![](.gitbook/assets/ping-mu-kuai-zhao-20190823-xia-wu-8.34.07.png)
+![](../.gitbook/assets/ping-mu-kuai-zhao-20190823-xia-wu-8.34.07.png)
 
 
 
