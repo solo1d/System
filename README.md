@@ -26,6 +26,25 @@ $objdump -d mastore.o
     #对mastore.o文件执行反汇编, 显示可执行部分的汇编内容.(输出内容: 左侧编号是地址,右侧是汇编)
 ```
 
+### **readelf  可重定向目标文件查看工具   \(就是 .o 文件\)**
+
+**GUN  的 `readelf` 程序是一个查看目标文件内容很方便的工具. \(就是命令\)     `linux> readelf -a x.o  >   file.txt     #把结果放到文本内,方便查看`**
+
+### 编译命令
+
+```text
+linux> cpp   a.c    #预处理命令, 生成一个 ASCII码的中间文件 a.i
+linux> ccl   a.i    #编译器命令, 生成一个 ASCII码的汇编文件 a.s
+linux> as    a.s    #汇编命令,   生成一个 可重定位目标文件  a.o
+linux> ld    a.o    #链接命令, 生成一个可执行的目标文件. a.out
+
+linux> ar  rcs libxx.a  a.o     #静态库生成命令,将 a.o 可重定位目标文件,打包成.a 静态库文件
+linux> gcc  main.o -L. -lxx     #使用静态库, -L. 指定本级目录, -lxx 静态库名简写(libxx.a)
+                                    #可以生成一个可执行文件
+
+
+```
+
 ### vim
 
 ```bash
