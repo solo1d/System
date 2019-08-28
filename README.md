@@ -24,6 +24,12 @@ $gcc -Og -c maastore.c
 ```bash
 $objdump -d mastore.o
     #对mastore.o文件执行反汇编, 显示可执行部分的汇编内容.(输出内容: 左侧编号是地址,右侧是汇编)
+在linux下，用readelf来看ELF头部或者其它各section的内容，用objdump来对指定的内容
+    （.text, .data等）进行反汇编。
+
+但是mac os X下没有这两个命令，可以用brew来安装，
+        macos> brew update && brew install binutils
+    然后用greadelf和gobjdump 
 ```
 
 ### **readelf  可重定向目标文件查看工具   \(就是 .o 文件\)**
@@ -32,8 +38,8 @@ $objdump -d mastore.o
 
 ### 编译命令
 
-```text
-linux> cpp   a.c    #预处理命令, 生成一个 ASCII码的中间文件 a.i
+```bash
+linux> cpp   a.c    #预处理命令, 生成一个 ASCII码的中间文件 a.i                                    
 linux> ccl   a.i    #编译器命令, 生成一个 ASCII码的汇编文件 a.s
 linux> as    a.s    #汇编命令,   生成一个 可重定位目标文件  a.o
 linux> ld    a.o    #链接命令, 生成一个可执行的目标文件. a.out
@@ -42,6 +48,8 @@ linux> ar  rcs libxx.a  a.o     #静态库生成命令,将 a.o 可重定位目�
 linux> gcc  main.o -L. -lxx     #使用静态库, -L. 指定本级目录, -lxx 静态库名简写(libxx.a)
                                     #可以生成一个可执行文件
 
+linux> gcc -rdynamic -o a.out  main.c -ldl        #生成一个会使用动态库或共享库的执行文件
+linux> gcc -fpic -shared -o  libvector.so  a.c    #生成一个动态库或共享库( -fpic 表示位置无关代码)
 
 ```
 
