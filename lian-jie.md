@@ -551,14 +551,178 @@ int main(int argc, const char * argv[]) {
 ```text
 linux> gcc -rdynamic -o a.out  main.c -ldl        #生成一个会使用动态库或共享库的执行文件
 linux> gcc -fpic -shared -o  libvector.so  a.c    #生成一个动态库或共享库( -fpic 表示位置无关代码)
+```
+
+* **PIC  数据引用**
+  * **无论在内存中的何处加载一个目标模块, 数据段和代码段之间的距离总是保持保持不变的.**
+    * **代码段中任何指令和数据段中任何变量之间的巨鹿都是运行时常量,与代码段和数据段的绝对内存位置是无关的.**
+  * **生成PIC引用的编译器在数据段开始的地方创建了一个表, 叫做`全局偏移量表( GOT)`**
+    * **在 GOT 中,每个被这个目标模块引用的全局数据目标都有一个 8字节条目.**
+    * **GOT 相对引用中的偏移量是一个运行时常量.**
+* **PIC 函数调用**
+  * **绑定延迟:**   将过程地址的绑定推迟到第一次调用该过程时, 虽然第一次调用开销很大,但是其后的每次调用都只会花费一条指令和一个间接的内存引用.
+    * 延迟绑定是用过两个数据结构之间简洁但又有些复杂的交互实现的.**这两个数据结构是:**
+      * **PLT \(过程链接表\)**
+        * 代码段的一部分
+        * 每个条目是 16字节代码
+          * PLT\[0\]  是一个特殊条目, 他跳转到**动态链接器**中.
+          * PLT\[1\] 调用系统启动函数 \( ————libc\_start\_main\) ,他初始化执行环境,调用 main函数并处理其返回值.
+          * 从 PLT\[2\] 开始的条目调用   用户代码调用的函数.
+        * 每个被可执行程序调用的库函数都有它自己的 PLT 条目.
+          * 每个条目都负责调用一个具体的函数
+      * **GOT \(全局偏移量表\)**
+        * 数据段的一部分
+        * 每个条目是8个字节地址.
+        * 和PLT联合使用时:
+          * GOT\[0\] 和 GOT\[1\] 包含动态链接器在解析函数地址时会使用的信息
+          * GOT\[2\]  是动态链接器 `ld-linux.so`  模块中的入口点
+          * 其余的每个条目对应于一个被调用的函数,其地址需要在运行时被解析.
+          * 每个条目都有一个相匹配的 PLT 条目.
+          * 初始时, 每个GOT 条目都指向对应 PLT 条目的第二条指令.
+    * 如果一个目标模块调用定义在共享库中的任何函数, 那么它就有自己的GOT 和 PLT .
+
+![](.gitbook/assets/ping-mu-kuai-zhao-20190830-xia-wu-6.17.41.png)
+
+![](.gitbook/assets/ping-mu-kuai-zhao-20190830-xia-wu-6.20.00.png)
+
+## 库打桩机制
+
+Linux  链接器支持 **库打桩** 技术.可以截获对共享库函数的调用,取而代之执行自己的代码,
+
+使用打桩机制, 可以追踪某个特殊函数的调用次数, 验证和追踪它的输入和输出值, 或者甚至把它替换成一个完全不同的实现.
+
+**基本思想 : 给定一个需要打桩的`目标函数`, 创建一个`包装函数`, 他的原型于目标函数完全一样. 使用某种特殊的打桩机制, 就可以欺骗系统调用包装函数而不是目标函数.**
+
+**打桩可以发生在编译时, 链接时 或 当程序被加载和执行的运行时.**
+
+### **编译时打桩**
+
+```c
+使用  C预处理器 在编译时打桩.
+liunx>  gcc -D宏定义  -c mymalloc.c      #宏定义是关键, 这个宏应该是 #ifdef XXX  #endif
+linux>  gcc  -I.  mymalloc.o  int.c    #-I 是关键,告诉预处理器在搜索系统目录之前,先搜索.目录
+
+#代码范例
+---------------------------------------------
+/* 这个文件是  stdlib.h    */
+#define malloc(size) mymalloc(size)    //这两个宏很重要, 它替换了在 int.c 中的代码
+#define free(ptr) myfree(ptr)            //将 malloc(size) 当成宏,替换成mymalloc(size)
+                                          //从而导致执行了 mymalloc 和 myfree 函数.
+void *mymalloc(size_t size);
+void myfree(void *ptr);
+
+---------------------------------------------
+/* 这个文件是  mymaclloc.c    */
+#ifdef COMPILETIME
+#include <stdio.h>
+#include <stdlib.h>
+
+/* malloc wrapper function */
+void *mymalloc(size_t size)            //会执行这里的代码.
+{
+    void *ptr = malloc(size); 
+    printf("malloc(%d)=%p\n", 
+           (int)size, ptr); 
+    return ptr;
+} 
+
+/* free wrapper function */
+void myfree(void *ptr)
+{
+    free(ptr); 
+    printf("free(%p)\n", ptr); 
+}
+#endif
+---------------------------------------------
+/* 这个文件是  int.c    */
+#include <stdio.h>
+#include <stdlib.h>    /*通过编译的 -I 命令,将这头文件修改成了 . 目录的, 而不是系统目录 */
+
+int main()
+{
+    int *p = malloc(32);
+    free(p);
+    return(0); 
+}
+---------------------------------------------
+
+编译命令:       #mac 使用的是 brew 安装的 gcc-9 , 所以有区别
+macos> gcc-9  -DCOMPILETIME -c mymalloc.c    #COMPILETIME是mymaclloc.c文件的判别宏
+macos> gcc-9 -I. -o intc int.c mymalloc.o
 
 ```
 
-\*\*\*\*
+### **链接时打桩**
 
-\*\*\*\*
+* **Linux静态链接器支持用 --wrap\_f  标志进行链接时打桩**
+  * **这个标志告诉链接器**
+    * **把对符号 f 的引用解析成 \_\_wrap\_f \(前面是两个下划线\),**
+    * **还要把对符号 \_\_real\_f\(前面还是两个下划线\) 的引用解析成f**
+* **编译命令:**
+  * **`linux> gcc  -D宏定义  -c mymalloc.c`** 
+    * **首先创建一个  包装函数    mymalloc.o**
+  * **`linux> gcc  -c  int.c`**
+    * **再创建一个 int.o 的执行函数\(main 在这个文件里 \)**
+  * **`linux> gcc  -Wl,--wrap,malloc  -Wl,--wrap,free   -o int   int.o  mymalloc.o`**
+    * **然后把文件链接成可执行文件,**
+      * **参数  -Wl,option    标志把 option 传递给链接器. option 中的每个逗号都要替换成一个空格\(**`但是不包括  -Wl,option  中间的那个逗号`**\)**
+        * **所以** `-Wl,--wrap,malloc` **就把**`--wrap malloc` **传递给链接器, \(free 同理\)**
+          * 将文件内的  **`malloc 变成 __wrap_malloc`** 
+          * 然后将文件内的 **`__real_malloc 变成 malloc`**
 
-\*\*\*\*
+```text
+也是在编译时 进行打桩;
+
+/* 这个文件是  stdlib.h    */
+#define malloc(size) mymalloc(size)    //这两个宏很重要, 它替换了在 int.c 中的代码
+#define free(ptr) myfree(ptr)            //将 malloc(size) 当成宏,替换成mymalloc(size)
+                                          //从而导致执行了 mymalloc 和 myfree 函数.
+void *mymalloc(size_t size);
+void myfree(void *ptr);
+
+---------------------------------------------
+/* 这个文件是  mymaclloc.c    */
+#ifdef LINKTIME
+#include <stdio.h>
+#include <stdlib.h>
+
+void *__real_malloc(size_t size);
+void __real_free(void *ptr);
+
+/* malloc wrapper function */
+void *__wrap_malloc(size_t size)
+{
+    void *ptr = __real_malloc(size); /* Call libc malloc */
+    printf("malloc(%d) = %p\n", (int)size, ptr);
+    return ptr;
+}
+
+/* free wrapper function */
+void __wrap_free(void *ptr)
+{
+    __real_free(ptr); /* Call libc free */
+    printf("free(%p)\n", ptr);
+}
+#endif
+---------------------------------------------
+/* 这个文件是  int.c    */
+#include <stdio.h>
+#include <stdlib.h>    /*通过编译的 -I 命令,将这头文件修改成了 . 目录的, 而不是系统目录 */
+
+int main()
+{
+    int *p = malloc(32);
+    free(p);
+    return(0); 
+}
+---------------------------------------------
+
+编译命令:   macos 不支持 --wrap 参数(ld不支持)
+linux> gcc -DLINKTIME -c mymalloc.c      #生成 mymaclloc.o 并启用代码段
+linux> gcc  -c  int.c                     #生成 main函数的 int.o 文件
+linux> gcc  -Wl,--wrap,malloc -Wl,--wrap,free -o intl int.o mymalloc.o   #生成可执行文件
+
+```
 
 \*\*\*\*
 
