@@ -32,6 +32,21 @@ $objdump -d mastore.o
     然后用greadelf和gobjdump 
 ```
 
+## 处理目标文件工具
+
+```bash
+Linux 系统中有大量可用的工具来处理目标文件, GUN binutils 包是最有用的.可以运行在每个linux 平台上
+
+     ar : 创建动态库,  插入, 删除, 列出  和提取成员. ($ ar rcs libxx.a  add.o sub.o )
+strings : 列出一个目标文件中所有可打印的字符串.
+  strip : 从目标文件中删除符号表信息
+     nm :  列出一个目标文件的符号表中定义的符号.
+   size : 列出目标文件中节的名字和大小.
+readelf :  显示一个目标文件的完整结构, 包括ELF头中编码的所有信息.包含 size 和nm 的功能.
+objdump : 所有二进制工具之母. 能够显示一个目标文件中所有的信息. 他最大的作用是反汇编 .text节中的二进制指令.
+    ldd : 列出一个可执行文件在运行时所需要的共享库.
+```
+
 ### **readelf  可重定向目标文件查看工具   \(就是 .o 文件\)**
 
 **GUN  的 `readelf` 程序是一个查看目标文件内容很方便的工具. \(就是命令\)     `linux> readelf -a x.o  >   file.txt     #把结果放到文本内,方便查看`**

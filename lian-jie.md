@@ -221,6 +221,8 @@ MAC OS 和 linux  下的静态库生成,打包,链接
 
 在Linux系统中, 静态库以一种称为存档的特殊文件格式存放在磁盘中. 存档文件是一组链接起来的可重定位目标文件的集合,有一个头部用来描述每个成员目标文件的大小和位置, 存档文件以后戳 .a 标示.
 
+**`ISO C99 中的,  标准I/O,字符串操作和整数数学函数 他们在 libc.a库中, (例如, atoi, printf, scanf, strcpy和rand),   还在 libm.a库中定义了一组广泛的浮点数学函数 (例如 sin, cos 和 sqrt).`**
+
 **符号解析阶段,链接器从左到右按照他们在编译器驱动程序命令行出现的顺序来扫描可重定位目标文件和存档文件.**
 
 * **在这次扫描中,链接器维护一个可重定位目标文件的集合 E  .\(这个集合的文件会被合并起来形成可执行文件.**
@@ -332,7 +334,7 @@ ELF定义了32种不同的重定位类型, 但是只关心两个基本的重定�
    
     假设 array 的地址是  0x601018 
   计算绝对地址
-       r.offset = 0x1             #表明在.test 代码段的位置
+       r.offset = 0x1             #表明在.text 代码段的位置
        r.symbol = array           #数组的名字
        r.type   = R_X86_64_32     #表明是绝对地址
        r.addend = 0               #表明无偏移量
@@ -345,7 +347,7 @@ ELF定义了32种不同的重定位类型, 但是只关心两个基本的重定�
 
 ![](.gitbook/assets/ping-mu-kuai-zhao-20190828-shang-wu-7.48.45-4.png)
 
-**因为可执行文件是完全链接的\(已被重定位\), 所以它不再需要 .rel.test 和 .rel.data  节.**
+**因为可执行文件是完全链接的\(已被重定位\), 所以它不再需要 .rel.text 和 .rel.data  节.**
 
 **ELF 可执行文件 被设计为很容易加载到内存, 可执行文件的连续的片被映射到连续的内存段.程序头部表 描述了这种映射关系.**
 
@@ -416,7 +418,7 @@ ELF定义了32种不同的重定位类型, 但是只关心两个基本的重定�
 
 * **共享库是以两种不同的方式来 "共享" 的**
   * **在任何给定的文件系统中, 对于一个库只有一个 .so 文件, 所有引用该库的可执行目标文件共享这个 .so 文件中的代码和数据, 而不是向静态库的内容那样被复制和嵌入到引用它们的可执行文件中.**
-  * **其次, 在内存中,一个共享库的  .test 节 的一个副本可以被不同的正在运行的进程共享. \(虚拟内存实现的\)**
+  * **其次, 在内存中,一个共享库的  .text 节 的一个副本可以被不同的正在运行的进程共享. \(虚拟内存实现的\)**
 * **给编译器和链接器如下指令来生成动态库**
   * **`linux>  gcc  -shared  -fpic  -o   libxx.so    a.c  b.c`**  
     * **`-fpic`**        指示编译器生成与位置无关的代码
@@ -597,6 +599,8 @@ Linux  链接器支持 **库打桩** 技术.可以截获对共享库函数的调
 
 ### **编译时打桩**
 
+**编译时打桩需要能够访问程序的源代码** \(.c文件\)
+
 ```c
 使用  C预处理器 在编译时打桩.
 liunx>  gcc -D宏定义  -c mymalloc.c      #宏定义是关键, 这个宏应该是 #ifdef XXX  #endif
@@ -654,6 +658,8 @@ macos> gcc-9 -I. -o intc int.c mymalloc.o
 
 ### **链接时打桩**
 
+**链接时打桩需要能够访问程序的可重定位对象文件. \(.o文件\)**
+
 * **Linux静态链接器支持用 --wrap\_f  标志进行链接时打桩**
   * **这个标志告诉链接器**
     * **把对符号 f 的引用解析成 \_\_wrap\_f \(前面是两个下划线\),**
@@ -666,11 +672,11 @@ macos> gcc-9 -I. -o intc int.c mymalloc.o
   * **`linux> gcc  -Wl,--wrap,malloc  -Wl,--wrap,free   -o int   int.o  mymalloc.o`**
     * **然后把文件链接成可执行文件,**
       * **参数  -Wl,option    标志把 option 传递给链接器. option 中的每个逗号都要替换成一个空格\(**`但是不包括  -Wl,option  中间的那个逗号`**\)**
-        * **所以** `-Wl,--wrap,malloc` **就把**`--wrap malloc` **传递给链接器, \(free 同理\)**
+        * **所以** `-Wl,--wrap,malloc` **就把**`--wrap malloc` **这个参数传递给链接器, \(free 同理\)**
           * 将文件内的  **`malloc 变成 __wrap_malloc`** 
           * 然后将文件内的 **`__real_malloc 变成 malloc`**
 
-```text
+```c
 也是在编译时 进行打桩;
 
 /* 这个文件是  stdlib.h    */
@@ -686,13 +692,13 @@ void myfree(void *ptr);
 #include <stdio.h>
 #include <stdlib.h>
 
-void *__real_malloc(size_t size);
-void __real_free(void *ptr);
+void *__real_malloc(size_t size);       /*这个会被修改为 void* malloc(size_t size);
+void __real_free(void *ptr);            /*这个会被修改为 void  free (void* ptr);
 
 /* malloc wrapper function */
-void *__wrap_malloc(size_t size)
+void *__wrap_malloc(size_t size)        /*这个函数名不会被修改*/
 {
-    void *ptr = __real_malloc(size); /* Call libc malloc */
+    void *ptr = __real_malloc(size);    /*这个函数会被修改为 malloc(size),调用的是系统函数*/ 
     printf("malloc(%d) = %p\n", (int)size, ptr);
     return ptr;
 }
@@ -700,14 +706,14 @@ void *__wrap_malloc(size_t size)
 /* free wrapper function */
 void __wrap_free(void *ptr)
 {
-    __real_free(ptr); /* Call libc free */
+    __real_free(ptr);                 /* 也是调用的系统函数,前面的__real_ 会被删除,变成free*/
     printf("free(%p)\n", ptr);
 }
 #endif
 ---------------------------------------------
 /* 这个文件是  int.c    */
 #include <stdio.h>
-#include <stdlib.h>    /*通过编译的 -I 命令,将这头文件修改成了 . 目录的, 而不是系统目录 */
+#include <stdlib.h>    
 
 int main()
 {
@@ -724,15 +730,94 @@ linux> gcc  -Wl,--wrap,malloc -Wl,--wrap,free -o intl int.o mymalloc.o   #生成
 
 ```
 
-\*\*\*\*
+### 运行时打桩
 
-\*\*\*\*
+**运行时打桩只需要能够访问可执行目标文件.\( .out可执行文件\)**
 
-\*\*\*\*
+**运行时打桩这个机制 基于 `动态链接器`的 `LD_PRELOAD` 环境变量.**
 
-\*\*\*\*
+**`LD_PRELOAD` 被设置为一个共享路径名的列表\(以空格或分号分隔\), 那么当你加载和执行一个程序,需要解析未定义的引用时,动态链接器\(`LD_LINUX.SO`\)会先搜索 `LD_PRELOAD 库`,然后才搜索其他的库.\(有了机制, 当加载和执行 任意可执行文件时,可以对任何共享库中的任何函数打桩, 包括 libc.so \).**
 
-\*\*\*\*
+* 同样需要包装函数和共享库
+  * **`linux>  gcc -D宏定义  -shared  -fpic  -o  mymalloc.so  mymalloc.c  -ldl`** 
+    * 这里面封装了包装函数,然后打包成共享库
 
-\*\*\*\*
+```c
+假设主程序中调用了 malloc 和 free 两个标准库函数. 可执行主程序名为 intr 
+
+/* mymaoolc.c */
+#ifdef RUNTIME            /* 判断定义宏*/
+#define _GNU_SOURCE      /*这个宏,  在下面有详细说明 */
+#include <stdio.h>
+#include <stdlib.h>
+#include <dlfcn.h>
+
+/* malloc wrapper function */
+void *malloc(size_t size)
+{
+    void *(*mallocp)(size_t size);
+    char *error;
+
+    mallocp = dlsym(RTLD_NEXT, "malloc"); /* Get address of libc malloc */
+    if ((error = dlerror()) != NULL) {
+        fputs(error, stderr);
+        exit(1);
+    }
+    char *ptr = mallocp(size); /* Call libc malloc */
+    printf("malloc(%d) = %p\n", (int)size, ptr);
+    return ptr;
+}
+
+/* free wrapper function */
+void free(void *ptr)
+{
+    void (*freep)(void *) = NULL;
+    char *error;
+
+    if (!ptr)
+        return;
+
+    freep = dlsym(RTLD_NEXT, "free"); /* Get address of libc free */
+    if ((error = dlerror()) != NULL) {
+        fputs(error, stderr);
+        exit(1);
+    }
+    freep(ptr); /* Call libc free */
+    printf("free(%p)\n", ptr);
+}
+#endif
+
+---------------------------------------------
+
+
+_GNU_SOURCE  说明:
+  定义_GNU_SOURCE与许可证和与编写(非)可移植代码有关的一切无关。如果你定义_GNU_SOURCE，你会得到：
+     >访问大量非标准GNU / Linux扩展功能  
+     >访问POSIX标准中省略的传统函数(通常有很好的理由，例如替换为更好的替代方案，或者绑定到特定的传统实现)
+     >访问不能移植的低级功能，但是您有时需要实现像mount，ifconfig等系统实用程序。
+     >很多POSIX指定函数的破坏行为，其中GNU人们不同意标准委员会如何功能应该行为和决定做自己的事情。
+
+编译和运行:    (运行命令和shell 版本不同而有所区别, 命令 printenv SHELL  查看shell版本)
+    linux> gcc -DRUNTIME -shared -fpic -o mymalloc.so mymalloc.c -ldl    #编译共享库
+    linux> LD_PRELOAD="./mymalloc.so" ./intr         #进行运行 (bash 版本, MAC无法运行)
+
+    linux> ( setenv LD_PRELOAD "./mymalloc.so" ; ./intr ; unsetenv LD_PRELOAD )
+                                                    #运行程序  (csh 或 tcsh 版本)
+可以使用 LD_PRELOAD 对任何可执行程序的库函数调用打桩.
+```
+
+## 处理目标文件工具
+
+```bash
+Linux 系统中有大量可用的工具来处理目标文件, GUN binutils 包是最有用的.可以运行在每个linux 平台上
+
+     ar : 创建动态库,  插入, 删除, 列出  和提取成员. ($ ar rcs libxx.a  add.o sub.o )
+strings : 列出一个目标文件中所有可打印的字符串.
+  strip : 从目标文件中删除符号表信息
+   nm   :  列出一个目标文件的符号表中定义的符号.
+   size : 列出目标文件中节的名字和大小.
+readelf :  显示一个目标文件的完整结构, 包括ELF头中编码的所有信息.包含 size 和nm 的功能.
+objdump : 所有二进制工具之母. 能够显示一个目标文件中所有的信息. 他最大的作用是反汇编 .text节中的二进制指令.
+    ldd : 列出一个可执行文件在运行时所需要的共享库.
+```
 
