@@ -89,11 +89,12 @@
 * **系统级函数写的hello world**
 
   ```text
-    int main()
-    {
-        write(1,"hello,world\n",13);
-        exit(0);
-    }
+  #include <unistd.h>
+  int main()
+  {
+      write(1,"hello,world\n",13);   /* 1代表 stdout, 中间是字符串参数, 13是字符串长度*/
+      _exit(0);
+  }
   ```
 
 * **汇编写的hello world**
@@ -101,7 +102,7 @@
   ```text
   .section .data
   string:
-          .ascii "hello, world\n"
+          .ascii "hello, world\n"        #在MACos中是 .asciz "hello, world\n"
   string_end:
           .equ len, string_end - string
   .section .text
@@ -119,18 +120,4 @@
           movq $0, %rdi        # Arg1: exit status is 0      
           syscall              # Make the system call  
   ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

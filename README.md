@@ -16,7 +16,9 @@ $gcc -Og -S mastore.c
  
 $gcc -Og -c maastore.c
     #无优化编译文件,生成.o二进制文件  mastore.o
-    
+
+大于 2GB的程序可以用 -mcmodel=medium  (中型代码模型)
+    或者 -mcmodel=large  (大型代码模型来编译)
 ```
 
 ### objdump    反汇编器
