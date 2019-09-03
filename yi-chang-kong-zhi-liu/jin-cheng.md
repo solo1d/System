@@ -124,7 +124,7 @@
 
 * 当Unix系统级函数遇到错误时，他们典型地**返回-1**，并**设置**全局变量`errno`来表示什么出错了。
 
-  ```text
+  ```c
     if((pid=fork()<0){
             fprintf(stderr,"fork error: %s\n", strerror(errno));
             exit(0);
@@ -135,17 +135,276 @@
 
 ## 进程控制
 
+UNIX提供了大量从C程序中操作进程的系统调用\(陷阱\).
 
+### 获取进程ID
 
+```c
+#include<sys/types.h>
+#include<unistd.h>
 
+pid_t getpid(void);
+pid_t getppid(void);
+```
 
+* PID是每个进程唯一的正数。
+* `getpid()`返回调用进程的PID，`getppid()`返回它的父进程的PID。
+* 返回一个类型`pid_t`的值，在Linux系统下在type.h被定义为int
 
+### 创建和终止进程
 
+进程总是处于下面三种状态
 
+* 运行。进程要么在CPU中执行，要么等待执行，最终被内核调度。
+* 停止。进程的执行**被挂起**，且不会被调度。
+  * 收到`SIGSTOP`,`SIGTSTP`,`SIDTTIN`或者`SIGTTOU`信号，进程就会停止。
+  * 直到收到一个`SIGCONT`信号，在这个时刻，进程再次开始运行。
+  * `信号`是一种**软件中断**的形式。
+* 终止。进程永远停止。
+  * 收到一个信号。信号默认行为是终止进程。
+  * 从主程序返回
+  * 调用exit函数
+    * exit函数以`status退出状态`来终止进程（另一种设置方式在main中return \)
 
+#### 子进程
 
+父进程通过调用`fork`函数创建一个新的运行子进程
 
+```c
+#include<sys/types.h>
+#include<unistd.h>
 
+pid_t fork(void);
+返回：子进程返回0，父进程返回子进程的PID，如果出错，返回-1；
+```
+
+新创建的子进程几乎但不完全与父进程相同。
+
+* 子进程得到与父进程用户级虚拟地址空间相同的（但是独立的）一份拷贝。
+  * 包括文本，数据和bss段，堆以及用户栈。子进程还获得与父进程任何打开文件描述符相同的拷贝。
+  * 意味着当父进程调用fork时，子进程可以读写父进程中打开的任何文件。
+  * 父进程和新创建的子进程之间最大的区别在于有不同的PID 。
+* `fork()`函数会第一次调用，返回两次，一次在父进程，一次在子进程。
+  * 返回值用来明确是在父进程还是在子进程中执行。
+
+![](http://i.imgur.com/fpMFGrV.png)
+
+* **调用一次，返回两次**。
+  * 对于具有多个fork实例的需要仔细推敲了
+* **并发执行**
+  * 父进程和子进程是并发运行的独立进程。
+  * 内核可能以任意方式觉得执行他们的顺序。
+  * 不能对不同进程中指令的交替执行做任何假设。
+* **相同但是独立的地址空间**
+  * 在刚调用时，几乎什么都是相同的。
+  * 但是它们都有自己的私人空间，之后对x的改变是相互独立的。
+* **共享文件**
+  * 父进程和子进程都把他们的输出显示在屏幕上。
+  * 子进程继承了父进程所有打开的文件。
+
+画进程图会有帮助。
+
+### 回收子进程
+
+当一个进程由于某种原因**终止**时，内核并不是立即把它从系统中**清除**。相反，进程被保持在一种已终结的状态，知道被它的父进程 **回收**\(`reap`\)。
+
+当父进程回收已终止的子进程时，内核将子进程的退出状态传递给父进程，然后抛弃已终止的进程。
+
+一个终止了但还未被回收的进程叫做**僵死进程**
+
+如果父进程没有回收，而终止了，那么内核安排`init`进程来回收它们。
+
+* `init`进程的的PID位1，在系统初始化时由内核创建的。
+* 长时间运行的程序，如shell,服务器，总是应该回收他们的**僵死子进程**
+
+一个进程可以通过调用waitpid函数来等待它的子进程终止或停止
+
+```c
+#include<sys/types.h>
+#include<sys/wait.h>
+
+pid_t waitpid(pid_t pid ,int *status, int options);
+返回：如果成功，则为子进程的PID，如果WNOHANG,则为0，如果其他错误，则为-1.
+```
+
+`waitpid`函数有点复杂。默认\(`option=0`\)时，`waitpid`挂起调用进程的执行，知道它的等待集合中的一个子进程终止，如果等待集合的一个子进程在调用时刻就已经终止，那么`waitpid`立即返回。在这两种情况下，`waitpid`返回导致`waitpid`返回的已终止子进程的`PID`，并且将这个已终止的子进程从系统中去除。
+
+* 判断等待集合的成员等待集合的成员通过参数pid确定
+  * 如果`pid>0`,那么等待集合就是一个独立的子进程，它的进程`ID`等于`PID`
+  * 如果`pid=-1`，那么等待集合就是由父进程所有的子进程组成的。
+  * `waitpid`函数还支持其他类型的等待集合，包括UNIX进程组等，不做讨论。
+* 修改默认行为\(**此处书中有问题，作用写反了**\)可以通过将`options`设置为常量`WHOHANG`和`WUNTRACED`的各种组合，修改默认行为。
+  * **WHOHANG**: 如果等待集合中的任何子进程都还没有终止，那么立即返回（返回值为0\)
+    * 默认的行为返回已终止的子进程。
+    * 当你要检查已终止和被停止的子进程，这个选项会有用。
+  * **WUNTRACED**:挂起调用进程的执行，知道等待集合中的一个进程变为已终结或被停止。
+    * 返回的PID为导致的已终止或被停止的子进程`PID`·
+    * 默认的行为是挂起调用进程，直到有子进程终止。
+  * **WHOHANG\|WUNTRACED**: 立即返回，如果等待集合中没有任何子进程被停止或已终止，那么
+* 检查已回收子进程的退出状态如果`status` 参数是非空的，那么`waitpid`就会在`status`参数中放上关于导致返回的子进程的状态信息。`wait.h` 头文件定义解释`status`参数的几个宏\(函数宏\):
+  * **WIFEXITED\(status\)** : 如果子进程通过调用`exit`或者一个返回\(`return`\)正常终止，就返回真。
+  * **WEXITSATUS\(status\)**: 返回一个正常终止的子进程的退出状态。只有在`WIFEXITED`定义为真是，才会定义这个状态。
+  * **WIFSIGNALED\(status\)**: 如果子进程是因为一个未被捕获的**信号**终止的，那么就返回真
+  * **WTERMSIG\(status\)**: 返回导致子进程终止的信号的数目，只有在`WIFSIGNALED`返回真时，才会定义这个状态。
+  * **WIFSTOPPED\(status\)**: 如果引起返回的子进程当前是被停止的，那么就返回真。
+  * **WSTOPSIG\(status\)**: 取得引发子进程暂停的信号代码，只有在WIFSTOPPED为真，才定义这个状态。
+* 错误条件
+  * 调用进程没有子进程，那么`waitpid`返回`-1`，并且设置`errno`为`ECHILD`。
+  * 如果`waitpid`函数被一个信号中断，那么它返回`-1`，并且设置`errno`为`EINTR`。
+
+![](http://i.imgur.com/t8fm16K.png)
+
+```text
+Q：凭什么输出bcac序列
+
+A: 不可能出现 bcac 的序列.
+```
+
+* wait 函数
+
+  wait函数是waitpid函数的简单版本：
+
+  ```c
+    #include<sys/types.h>
+    #include<sys/wait.h>
+
+    pid_t wait(int *status);
+  ```
+
+  调用`wait(&status)`等价于调用`waitpid(-1,&status,0)`。
+
+* waitpid实例，按顺序回收僵死进程
+
+![](http://i.imgur.com/lVasxAT.png)
+
+### 让进程休眠
+
+* `sleep`函数将一个进程挂起一段指定时间
+
+  ```c
+    #include <unistd.h>
+
+    unsigned int sleep (unsigned int secs);
+    返回：还要休眠的描述
+  ```
+
+* `pause` 让调用进程休眠，知道该进程收到一个信号
+
+  ```c
+    #include<unistd.h>
+
+    int pause(void);
+  ```
+
+### 加载并运行一个程序
+
+`execve`函数在当前进程的**上下文**中加载并运行了一个新程序。
+
+```c
+#include <unistd.h>
+
+int execve(const char *filename,const char *argv[],const char *envp[]);
+```
+
+`execve`函数加载并运行可执行目标文件`filename`，且带参数`argv`和环境变量列表`envp`。
+
+只有当出现错误时，execve才会返回到**调用程序**
+
+```c
+/* 调用例子*/
+#include <stdio.h>
+#include <unistd.h>
+int main(void){
+    char *argv1[4] = {"-lh", "/bin"};    /* 字符串指针数组,可以存放4个char* 指针 */
+    printf("%d a \n", execve("/bin/ls",argv1,NULL));   /* 调用的是 ls 命令*/
+    printf("111\n");                     /* 调用成功后, 这两个 printf 就没有了输出 */
+}
+```
+
+* `*argv[]`参数列表数据结构表示
+  * ![](http://i.imgur.com/mOJqOCg.png)
+  * 指向一个以`null`结尾的**指针数组**。
+  * 每个**指针**指向一个**参数串**。
+    * 一般来说，`argv[0]`是可执行目标文件的名字。
+* `*envp[]`环境列表数据结构表示类似
+  * ![](http://i.imgur.com/G2QhClw.png)
+  * 指向一个以`null`结尾的**指针数组**。
+  * 每个**指针**指向一个**环境变量串**。
+    * 每个串都是形如`KEY=VALUE`的 键值对
+
+在`execve`加载`filename`以后，调用**启动代码\(\_\_libc\_start\_main\)**,启动代码设置用户栈。并将控制传递给新程序的主函数。
+
+* 主函数有如下原型
+
+  int main\(int argc,char \*\* **argv,  char \*\*** envp\);  
+  int main\(int argc,char \*_argv\[\],  char \*_envp\[\]\);
+
+* 当开始执行时，用户栈如图。
+  * ![](../.gitbook/assets/ping-mu-kuai-zhao-20190903-xia-wu-2.50.21.png) 
+  * `argc`: 给出 argv数组中非空指针的数量.
+  * `argv`: 命令行指针数组的地址
+  * `envp`: 环境变量指正数组的地址
+  * **environ : 指向这些指针中的的第一个 envp\[0\]**
+
+Unix提供一下**几个函数**来操作环境数组。
+
+* `getenv`
+
+  ```c
+    #include<stdlib.h>
+    char *getenv(const char *name);
+    //getenv函数在环境变量搜索字符串“name=value"。如果找到了，它就返回一个指向value的指针，否则返回NULL。
+  ```
+
+* `setenv`和`unsetenv`
+
+  ```c
+    #include<stdlib.h>
+    int setenv(const char *name,const char *newvalue,int overwrite);
+    //成功返回0，错误返回-1
+    void unsetenv(const char *name);
+
+    //如果环境数组包含一个形如"name=oldvalue"的字符串，那么unsetenv会删除它
+    //，而setenv会用newvalue代替oldvalue,但是只有在overwirte非零时才会这样。
+    //如果name不存在，那么setenv就把”name=newvalue"添加进指针数组。
+  ```
+
+```c
+/* 获取程序参数和 环境变量的通用代码 */
+#include <stdio.h>
+#include <stdlib.h>
+int main(int argc, char *argv[], char *envp[])
+{
+    int i;
+    
+    printf("Command-line arguments:\n");
+    for (i=0; argv[i] != NULL; i++)
+        printf("    argv[%2d]: %s\n", i, argv[i]);
+    
+    printf("\n");
+    printf("Environment variables:\n");
+    for (i=0; envp[i] != NULL; i++)
+        printf("    envp[%2d]: %s\n", i, envp[i]);
+    
+    exit(0);
+}
+```
+
+`程序`与`进程`的区别
+
+* 程序 是一堆代码和数据;
+  * 程序可以作为目标文件存在于磁盘上,或者作为段存在于地址空间中.
+* 进程是执行中程序的一个具体实例;
+  * 程序总是运行在某个进程的上下文中.
+
+`fork`与`execve`区别
+
+* `fork`:在新的子进程运行相同的程序。
+  * 新进程是父进程的复制品。
+* `execve`:在当前进程的上下文加载并运行一个新的程序。
+  * **覆盖当前进程的地址空间。**
+  * 但没有创建新进程。
+  * 新的程序仍然有相同的`PID`,并且继承了调用`execve`函数时已打开的所有文件描述符.
 
 
 
