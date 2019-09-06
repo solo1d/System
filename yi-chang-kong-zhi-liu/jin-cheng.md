@@ -285,15 +285,18 @@ A: 不可能出现 bcac 的序列.
     #include <unistd.h>
 
     unsigned int sleep (unsigned int secs);
-    返回：还要休眠的描述
+    参数是以秒为单位
+    返回值 : 达到参数设定的时间征程结束  会返回0
+            如果被信号中断而过早结束,  会返回 还剩下要休眠的秒数.
   ```
 
-* `pause` 让调用进程休眠，知道该进程收到一个信号
+* `pause` 让调用进程休眠，直到该进程收到一个信号
 
   ```c
     #include<unistd.h>
 
     int pause(void);
+      总是返回 -1 
   ```
 
 ### 加载并运行一个程序
@@ -314,12 +317,15 @@ int execve(const char *filename,const char *argv[],const char *envp[]);
 /* 调用例子*/
 #include <stdio.h>
 #include <unistd.h>
-int main(void){
-    char *argv1[4] = {"-lh", "/bin"};    /* 字符串指针数组,可以存放4个char* 指针 */
-    printf("%d a \n", execve("/bin/ls",argv1,NULL));   /* 调用的是 ls 命令*/
+extern char **environ; /* 一个定义在 unistd.h 中的 环境变量字符串指针数组 */
+int main(void){      /* argv1数组 .第一个是路径, 第二个和之后的才是参数 */
+    char *argv1[4] ={"/bin/ls","-lh", "/bin",NULL}; /* 字符串指针数组,可以存放4个char* 指针 */
+    printf("%d a \n", execve(argv1[0],argv1,environ));   /* 调用的是 ls 命令*/
     printf("111\n");                     /* 调用成功后, 这两个 printf 就没有了输出 */
 }
 ```
+
+**`environ 是一个全局变量 ,它指向环境变量字符串 那些指针中的第一个 envp[0] ; 用作execve()第三个参数.`**
 
 * `*argv[]`参数列表数据结构表示
   * ![](http://i.imgur.com/mOJqOCg.png)
@@ -406,25 +412,139 @@ int main(int argc, char *argv[], char *envp[])
   * 但没有创建新进程。
   * 新的程序仍然有相同的`PID`,并且继承了调用`execve`函数时已打开的所有文件描述符.
 
+### 利用 fork 和 execve  运行程序
 
+**Unix shell**和**Web服务器** 这样的程序大量使用`fork`和`execve`函数。
 
+**shell**是一种交互型的应用级程序，代表用户运行其他程序。
 
+* 最早的`shell`是`sh`程序。
+* 后面出现了`csh`,`tcsh`,`ksh`,`bash`。
+* **shell**执行一系列 **read/evaluate**
+  * **read**:读取来自用户的命令。
+  * **evaluate**:解析命令，并代表用户执行程序。
 
+其实`shell`也就是一个ACM中很简单的模拟题而已。
 
+* 对字符串的处理。考虑各种`trick`。
+* 通过判断命令结尾是否有`&` 来决定`shell`是否`waitpid`。即是否后台运行。
 
+```c
+/* $begin shellmain */
+#include "csapp.h"
+#define MAXARGS   128
 
+/* Function prototypes */
+void eval(char *cmdline);
+int parseline(char *buf, char **argv);
+int builtin_command(char **argv); 
 
+int main() 
+{
+    char cmdline[MAXLINE]; /* Command line */
 
+    while (1) {
+	/* Read */
+	printf("> ");                   
+	Fgets(cmdline, MAXLINE, stdin); 
+	if (feof(stdin))
+	    exit(0);
 
+	/* Evaluate */
+	eval(cmdline);
+    } 
+}
+/* $end shellmain */
+  
+/* $begin eval */
+/* eval - Evaluate a command line */
+void eval(char *cmdline) 
+{
+    char *argv[MAXARGS]; /* Argument list execve() */
+    char buf[MAXLINE];   /* Holds modified command line */
+    int bg;              /* Should the job run in bg or fg? */
+    pid_t pid;           /* Process id */
+    
+    strcpy(buf, cmdline);
+    bg = parseline(buf, argv); 
+    if (argv[0] == NULL)  
+	return;   /* Ignore empty lines */
 
+    if (!builtin_command(argv)) { 
+        if ((pid = Fork()) == 0) {   /* Child runs user job */
+            if (execve(argv[0], argv, environ) < 0) {
+                printf("%s: Command not found.\n", argv[0]);
+                exit(0);
+            }
+        }
 
+	/* Parent waits for foreground job to terminate */
+	if (!bg) {
+	    int status;
+	    if (waitpid(pid, &status, 0) < 0)
+		unix_error("waitfg: waitpid error");
+	}
+	else
+	    printf("%d %s", pid, cmdline);
+    }
+    return;
+}
 
+/* If first arg is a builtin command, run it and return true */
+int builtin_command(char **argv) 
+{
+    if (!strcmp(argv[0], "quit")) /* quit command */
+	exit(0);  
+    if (!strcmp(argv[0], "&"))    /* Ignore singleton & */
+	return 1;
+    return 0;                     /* Not a builtin command */
+}
+/* $end eval */
 
+/* $begin parseline */
+/* parseline - Parse the command line and build the argv array */
+int parseline(char *buf, char **argv) 
+{
+    char *delim;         /* Points to first space delimiter */
+    int argc;            /* Number of args */
+    int bg;              /* Background job? */
 
+    buf[strlen(buf)-1] = ' ';  /* Replace trailing '\n' with space */
+    while (*buf && (*buf == ' ')) /* Ignore leading spaces */
+	buf++;
 
+    /* Build the argv list */
+    argc = 0;
+    while ((delim = strchr(buf, ' '))) {
+	argv[argc++] = buf;
+	*delim = '\0';
+	buf = delim + 1;
+	while (*buf && (*buf == ' ')) /* Ignore spaces */
+            buf++;
+    }
+    argv[argc] = NULL;
+    
+    if (argc == 0)  /* Ignore blank line */
+	return 1;
 
+    /* Should the job run in the background? */
+    if ((bg = (*argv[argc-1] == '&')) != 0)
+	argv[--argc] = NULL;
 
+    return bg;
+}
+/* $end parseline */
+```
 
+* 输出一个`>`，等待接收命令。
+* 调用`eval`对命令运算。
+* `parseline`解析以空格分割的命令行参数，并将分割后的值丢入`argv`中。
+  * 如果末尾是`&`，则返回1。表示**后台运行**
+* `builtin_command` 判断一下是否存在这样的指令。
+* 如果`bg=0`，那么等待程序结束，`shell`才会继续执行。
+* `parseline`具体代码就不贴了。
+
+注意这个简单的`shell`是有缺陷的，因为它并不回收它的后台子进程。修改这个缺陷，就必须使用**信号**。
 
 
 
