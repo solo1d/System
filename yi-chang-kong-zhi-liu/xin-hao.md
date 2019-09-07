@@ -429,27 +429,387 @@ handler_t *Signal(int signum, handler_t *handler)
 
 ### 同步流以避免讨厌的并发错误
 
+如何编写读写**相同存储位置**的并发流程序的问题，困扰着数代计算机科学家。
+
+* 流可能**交错** 的数量是与**指令数** 量呈**指数关系**
+  * 有些交错会产生正确结果，有些可能不会。
+
+所谓`同步流`就是。以某种方式`同步`**并发流**，从而得到 **最大的可行交错的集合** ，每个交错集合都能得到正确的结果。
+
+**并发编程**是一个很深奥，很重要的问题。在第12章详细讨论。
+
+现在我们只考虑一个并发相关的智力挑战。
+
+![](http://i.imgur.com/mh0wN05.png)
+
+```c
+#include "csapp.h"
+
+void initjobs()
+{
+}
+
+void addjob(int pid)
+{
+}
+
+void deletejob(int pid)
+{
+}
+
+/* $begin procmask1 */
+/* WARNING: This code is buggy! */
+void handler(int sig)
+{
+    int olderrno = errno;
+    sigset_t mask_all, prev_all;
+    pid_t pid;
+
+    Sigfillset(&mask_all);
+    while ((pid = waitpid(-1, NULL, 0)) > 0) { /* Reap a zombie child */
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        deletejob(pid); /* Delete the child from the job list */
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+    }
+    if (errno != ECHILD)
+        Sio_error("waitpid error");
+    errno = olderrno;
+}
+    
+int main(int argc, char **argv)
+{
+    int pid;
+    sigset_t mask_all, prev_all;
+
+    Sigfillset(&mask_all);
+    Signal(SIGCHLD, handler);
+    initjobs(); /* Initialize the job list */
+
+    while (1) {
+        if ((pid = Fork()) == 0) { /* Child process */
+            Execve("/bin/date", argv, NULL);
+        }
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all); /* Parent process */  
+        addjob(pid);  /* Add the child to the job list */
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);    
+    }
+    exit(0);
+}
+/* $end procmask1 */
+```
+
+如果发生以下情况，会出现**同步错误**。
+
+* 父进程执行`fork`函数，内核调度新创建的子进程运行，而不是父进程。
+* 在父进程再次运行前，子进程已经终止，变成僵死进程，需要内核一个`SIGCHLD`信号给父进程
+* 父进程处理信号，调用`deletejob`.
+* 调用`addjob`。
+
+显然`deletejob`必须在`addjob`之后，不然添加进去的job永久存在。这就是**同步错误**。
+
+这是一个称为`竞争`\(race\)的经典同步错误的示例。
+
+* `main`中的`addjob`和处理程序中调用`deletejob`之间存在竞争。
+* 必须`addjob`赢得进展，结果才是正确的，否则就是错误的。但是`addjob`不一定能赢，所以有可能错误。即为同步错误。
+* 因为内核的调度问题，这种错误十分难以被发现。难以调试。
+
+{% hint style="info" %}
+Q：如何消除竞争？
+
+A：可以在fork之前，阻塞`SIGCHLD`信号，在调用`addjob`后取消阻塞。
+{% endhint %}
+
+* 注意，子进程继承了阻塞，我们要小心地接触子进程中的阻塞。
+* 消除竞争的原则就是，让该赢得竞争的对象在任何情况下都能赢。
+
+#### 修改过的,保证父进程在相应的 deletejob 之前执行 addjod
+
+```c
+#include "csapp.h"
+
+void initjobs()
+{
+}
+
+void addjob(int pid)
+{
+}
+
+void deletejob(int pid)
+{
+}
+
+/* $begin procmask2 */
+void handler(int sig)
+{
+    int olderrno = errno;
+    sigset_t mask_all, prev_all;
+    pid_t pid;
+
+    Sigfillset(&mask_all);
+    while ((pid = waitpid(-1, NULL, 0)) > 0) { /* Reap a zombie child */
+        Sigprocmask(SIG_BLOCK, &mask_all, &prev_all);
+        deletejob(pid); /* Delete the child from the job list */
+        Sigprocmask(SIG_SETMASK, &prev_all, NULL);
+    }
+    if (errno != ECHILD)
+        Sio_error("waitpid error");
+    errno = olderrno;
+}
+    
+int main(int argc, char **argv)
+{
+    int pid;
+    sigset_t mask_all, mask_one, prev_one;
+
+    Sigfillset(&mask_all);
+    Sigemptyset(&mask_one);
+    Sigaddset(&mask_one, SIGCHLD);
+    Signal(SIGCHLD, handler);
+    initjobs(); /* Initialize the job list */
+
+    while (1) {
+        Sigprocmask(SIG_BLOCK, &mask_one, &prev_one); /* Block SIGCHLD */
+        if ((pid = Fork()) == 0) { /* Child process */
+            Sigprocmask(SIG_SETMASK, &prev_one, NULL); /* Unblock SIGCHLD */
+            Execve("/bin/date", argv, NULL);
+        }
+        Sigprocmask(SIG_BLOCK, &mask_all, NULL); /* Parent process */  
+        addjob(pid);  /* Add the child to the job list */
+        Sigprocmask(SIG_SETMASK, &prev_one, NULL);  /* Unblock SIGCHLD */
+    }
+    exit(0);
+}
+/* $end procmask2 */
+
+```
+
+### 显示的等待信号
+
+sleep 和 pause  这两个函数比较浪费时间和CPU, 而且还不好掐算时间和信号.
+
+解决方法是使用下面这个函数:
+
+```c
+#include <signal.h>
+int sigsuspend( const  sigset_t* mask);
+  使用 mask替换当前阻塞集合(一般是设置阻塞时的原阻塞备份),然后挂起该进程,直到收到一个信号,其行为要么
+      是运行一个信号处理程序, 要么是终止该进程. ( 根据收到的信号来区分).
+返回值: 这个函数一直返回 -1
+
+这个函数是三个函数的原子操作的集合体, 代表它不被任何情况中断. 绝对会执行完成.
+  sigprocmask(SIG_SETMASK, &mask, &prev);    /*代表 prev = blocked 和 blocked = mask */
+  pause();                                   /*等待一个信号,任何信号都可以, 随后继续执行 */
+  sigprocmask(SIG_SETMASK, &prev, NULL);     /*执行 blocked = prev   . 这三步不可中断 */
+```
+
+使用sigsuspend 来显示的等待信号.
+
+```c
+/* $begin sigsuspend */
+#include "csapp.h"
+
+volatile sig_atomic_t pid;
+
+void sigchld_handler(int s)
+{
+    int olderrno = errno;
+    pid = Waitpid(-1, NULL, 0);
+    errno = olderrno;
+}
+
+void sigint_handler(int s)
+{
+}
+
+int main(int argc, char **argv) 
+{
+    sigset_t mask, prev;
+
+    Signal(SIGCHLD, sigchld_handler);
+    Signal(SIGINT, sigint_handler);
+    Sigemptyset(&mask);
+    Sigaddset(&mask, SIGCHLD);
+
+    while (1) {
+        Sigprocmask(SIG_BLOCK, &mask, &prev); /* Block SIGCHLD */
+        if (Fork() == 0) /* Child */
+            exit(0);
+
+        /* Wait for SIGCHLD to be received */
+        pid = 0;
+        while (!pid) 
+            Sigsuspend(&prev);
+
+        /* Optionally unblock SIGCHLD */
+        Sigprocmask(SIG_SETMASK, &prev, NULL); 
+
+        /* Do some work after receiving SIGCHLD */
+        printf(".");
+    }
+    exit(0);
+}
+/* $end sigsuspend */
+```
 
 
 
+## 非本地跳转
 
+C语言提供一种用户级异常控制流形式，称为`非本地跳转(nonlocal jump)`。
 
+* 它将控制直接从一个函数转移到另一个当前正在执行的函数。不需要经过正常的**调用-返回**序列。
+* 非本地跳转是通过`setjmp`和`longjmp`函数来提供。
 
+  ```c
+    #include<setjmp.h>
 
+    int setjmp(jmp_buf env);
+        参数类型定义在 setjmp.h 中, 就是个用来保存当前程序状态的缓冲区结构体.(无信号值)
+            第一次调用返回值是0, 第二次通过longjmp()调用返回这个函数指定的 retval 的值.
+  
+    int sigsetjmp(sigjmp_buf env,int savesigs);    //信号处理程序使用
+       参数类型定义在 setjmp.h 中, 就是个用来保存当前程序状态的缓冲区结构体.
+                                     (有信号值, 但没有 待处理信号表 和 阻塞信号表)
+            第一次调用返回值是0, 第二次通过siglongjmp()调用返回这个函数指定的 retval 的值.
+    //参数savesigs若为非0则代表搁置的信号集合也会一块保存 
+  ```
 
+  * `setjmp`函数在`env`缓冲区保存当前调用环境，以供后面`longjmp`使用，并返回0
 
+    * 调用环境包括**程序计数器**，**栈指针**，**通用目的寄存器**。
 
+    ```c
+    #include
+      void longjmp(jmp_buf env,int retval);
+      void siglongjmp(sigjmp_buf env,int retval);//信号处理程序使用
+    ```
 
+  * `longjmp`函数从env缓冲区中恢复调用环境，然后触发一个从最近一次初始化env的`setjmp`调用的返回。然后`setjmp`返回，并带有非零的返回值`retval`（看清楚从`setjmp`返回）
+    * `setjmp`返回多次，第一次是`0`，第二次是`retval`.
+    * `longjmp`从不返回。
 
+* `非本地跳转`的重要应用是允许从一个深层嵌套的函数调用立即返回。一般是发现了**错误**。
+  * 不用费力解开栈。
+  * 直接返回到一个普通的本地化的错误处理程序。
+  * 会造成内存泄漏
 
+{% hint style="info" %}
+C++和Java 中的软件异常
 
+C++和Java提供的异常机制是较高层次的，是C语言setjmp和longjmp函数的更加结构化的版本。你可以把try语句中的catch字句看作setjmp函数。相似地,throw语句就类似与longjmp函数。
+{% endhint %}
 
+ 
 
+**一个实例: 使用了 非本地跳转从深层潜逃的函数调用中的错误情况恢复, 而不需要解开整个栈的基本结构.**
 
+```c
+/* $begin setjmp */
+#include "csapp.h"
 
+jmp_buf buf;
 
+int error1 = 0; 
+int error2 = 1;
 
+void foo(void), bar(void);
 
+int main() 
+{
+    switch(setjmp(buf)) {
+    case 0: 
+	foo();
+        break;
+    case 1: 
+	printf("Detected an error1 condition in foo\n");
+        break;
+    case 2: 
+	printf("Detected an error2 condition in foo\n");
+        break;
+    default:
+	printf("Unknown error condition in foo\n");
+    }
+    exit(0);
+}
+
+/* Deeply nested function foo */
+void foo(void) 
+{
+    if (error1)
+	longjmp(buf, 1); 
+    bar();
+}
+
+void bar(void) 
+{
+    if (error2)
+	longjmp(buf, 2); 
+}
+/* $end setjmp */
+
+```
+
+**例子2:  当用户键入 Ctrl + C 时, 使用非本地跳转来重启动它自身的程序**
+
+```c
+/* $begin restart */
+#include "csapp.h"
+
+sigjmp_buf buf;
+
+void handler(int sig) 
+{
+    siglongjmp(buf, 1);
+}
+
+int main() 
+{
+    if (!sigsetjmp(buf, 1)) {
+        Signal(SIGINT, handler);
+	Sio_puts("starting\n");
+    }
+    else 
+	Sio_puts("restarting\n");
+
+    while(1) {
+	Sleep(1);
+	Sio_puts("processing...\n");
+    }
+    exit(0); /* Control never reaches here */
+}
+/* $end restart */
+
+```
+
+## 操作进程的工具
+
+* `STRACE`\(痕迹\):打印一个正在运行的程序和它的子进程调用的每个系统调用的轨迹。
+  * 用`-static`编译，能得到一个更干净，不带有大量共享库相关的输出的轨迹。
+* `PS`\(**Processes Status**\)： 列出当前系统的进程\(包括僵死进程\)
+* `TOP`\(因为我们关注峰值的几个程序，所以叫TOP\):打印当前进程使用的信息。
+* `PMAP`\(**rePort Memory map of A Process**\): 查看进程的内存映像信息
+* `/proc`:一个虚拟文件系统，以ASCII文本格式输出大量内核数据结构。
+  * 用户程序可以读取这些内容。
+  * 比如，输入`"cat /proc/loadavg`，观察Linux系统上当前的平均负载。
+
+## 小结
+
+* `异常控制流(ECF)`发生在计算机系统的各个层次，是计算机系统中提供并发的基本机制。
+* 在**硬件层**，`异常`是处理器中的事件出发的控制流中的突变。控制流传递给一个异常处理程序，该处理程序进行一些处理，然后返回控制被中断的控制流。
+  * 有四种不同类型的异常：中断，故障，终止和陷阱。
+    * 定时器芯片或磁盘控制器，设置了处理器芯片上的**中断引脚**时，`中断`会**异步**发生。返回到`Inext`
+    * 一条指令的执行可能导致`故障`和`终止`同时出现。
+      * `故障`可能返回调用指令。
+      * `终止`不将控制返回。
+    * `陷阱`用于`系统调用`。结束后，返回`Inext`
+* 在**操作系统层**，内核用`ECF`提供进程的基本概念。`进程`给应用两个重要抽象:
+  * **逻辑控制流**
+  * **私有地址空间**
+* 在**操作系统和应用程序接口处**，有**子进程**，和**信号**。
+* 最后，C语言的`非本地跳转` 完成应用程序层面的异常处理。
+
+至此，`异常`贯穿了从底层硬件，到抽象的软件层次。
 
 
 
