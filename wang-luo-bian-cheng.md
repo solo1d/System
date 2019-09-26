@@ -600,7 +600,7 @@ int getaddrinfo(
 
 #### getnameinfo 函数
 
-```text
+```c
 将 套接字地址结构转换成相应的 主机和服务名字符串. ( 和getaddrinfo() 作用相反 ),一般用在服务器端.
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -608,35 +608,1754 @@ int getaddrinfo(
 
 int  getnameinfo(
     const struct sockaddr* sa,   /* 通过 accect 得到的第二个参数的数据结构,里面包含IP和端口号*/
-    socklen_t   salen,           /* sockaddr 的结构大小 */
-    char*   host,
-    size_t  hostlen,
-    char*   service,
-    size_t  servlen,
-    int   flage
+    socklen_t   salen,           /* sockaddr 的结构大小 ,就是第一个参数测大小*/
+    char*   host,                /* 保存 IP或域名的 字符串, 如果是IP长度给16,域名则要长很多*/
+    size_t  hostlen,             /* host 字符串的长度 */
+    char*   service,             /* 保存 端口号 或者 服务名 字符串 */
+    size_t  servlen,             /*  service 字符串 长度 */
+    int   flage                  /* 位掩码, 能够修改默认行为 */
     );
+可设置的变量  flage : NI_NUMERICHOST  强制向 host 参数写入IP地址,而不是域名
+                    NI_NUMERICSERV  向 service 写入端口号, 而不是服务名
 
+文件 /etc/services  记录着 端口和服务名 之间的映射. 可以进行查询.
 ```
 
+## Web服务器 和 HTTP
+
+**Web客户端和服务器之间的交互用的是一个基于文本的`应用级协议`, `HTTP`;**
+
+一个Web客户端\(浏览器\) 打开一个到服务器的因特网连接, 并且**请求**某些内容.  服务器相应所请求的内容,**然后关闭连接**.  浏览器读取这些内容, 并把它显示在屏幕上.
+
+* 通信过程
+  * 一个Web客户端\(浏览器\) 打开一个到服务器的因特网连接,
+    * 并且**`请求`**某些内容.
+  * 服务器**`响应`**所请求的内容
+    * **然后关闭连接**
+  * 浏览器读取这些内容
+    * 并把它显示在屏幕上
+
+Web内容可以用一种叫做  **`HTML`** \(超文本标记语言\) 的语言来编写.   一个HTML程序\(页\) 包含指令\(标记\) ,他们告诉浏览器如何显示这页中的各种文本和图形对象.
+
+HTML 强大之处在于一个页面可以包含指针\(超链接\) :   **`<a href="网址" >Carnegie Mellon</a>`**
+
+### Web内容
+
+对于Web 服务器和客户端而言,  内容是与一个 MIME\(多用途的网际邮件扩充协议\) 类型相关的字节序列.
+
+{% hint style="info" %}
+常用的 MIME 类型
+
+* **text/html**
+  * HTML 页面
+* **text/plain**
+  * 无格式文本
+* **application/postscript**
+  * Postscript 文档
+* **image/gif**
+  * GIF 格式编码的二进制图像
+* **image/png**
+  * PNG 格式编码的二进制图像
+* **image/jpeg**
+  * JPEG 格式编码的二进制图像
+* **wav**
+  * audio/wav
+* **mp3**
+  * audio/mpeg
+* **avi**
+  * video/x-msvideo
+* **mov**
+  * video/quicktime
+{% endhint %}
+
+Web服务器以两种不同的方式向客户端提供内容
+
+* 取一个磁盘文件,并将它的内容返回给客户端, 磁盘文件称为**静态内容**
+  * 而返回文件给客户端的过程称为 **服务静态内容**
+* 运行一个可执行文件, 并将它的输出返回给客户端. 运行时可执行文件产生的输出称为 **动态内容**
+  * 运行程序并返回它的输出到客户端的过程称为 **服务动态内容**
+
+{% hint style="info" %}
+每条由  Web 服务器返回的内容都是和它管理的某个文件关联的,  这些文件中的每个都有一个唯一个名字, 叫做 **`URL`**\(通用资源定位符\). 是URI 的一个子集.
+
+**`http://www.google.com:80/index.html`**
+
+可执行文件的 URL可以在文件名后面包括程序参数, "?" 字符分隔文件名和参数,而且每个参数都用 "&" 字符分隔开.
+
+**`http://www.ppt.com:80/cgi-bin/adder?15000&113`**
+
+* 标识了一个叫做 /cgi-bin/adder 的可执行文件
+  * 会带两个参数字符串 15000 和 113 来调用他
+
+#### 在事务过程中, 客户端和服务器使用的是 URL 的不同部分,  
+
+* 客户端使用的是前缀, 来决定与哪类服务器联系,服务器在哪里,以及它监听的端口号是多少
+  * **`http://www.google.com:80`**
+* 服务器使用后缀,来发现它文件系统中的文件, 并确定请求的是**静态内容**还是**动态内容.**
+  * **/index.html**
+
+**最小的URL后缀是""/字符, 所有的服务器将其扩展为某个默认主页, 如 /index.html ,  也就是说在浏览器中渐入一个域名就可以取出一个网站的主页.**  
+
+**浏览器在 URL 后添加缺失的 "/", 并将之传递给服务器, 服务器又把 "/" 扩展到某个默认的文件名.**
+{% endhint %}
+
+### **HTTP事务**
+
+**可以使用 telnet 命令来和因特网上的任何 Web 服务器执行事务. 对于调试通过文本行来与客户端对话的服务器来说, 是非常便利的.**
+
+```bash
+一个静态内容的 HTTP 事务;
+请求行, 请求报头,  相应行, 响应报头, html响应主体 .这些内容在C 中每行结尾都必须是 "\r\n"
+
+linux>  telnet   www.aol.com  80        客户端:  打开与服务器的连接
+Trying 98.136.100.146...                telnet命令打印三行到终端
+Connected to aol.com.
+Escape character is '^]'.
+GET / HTTP/1.1                          这一行是我们输入的请求行: GET请求  URI HTTP版本
+Host: www.aol.com                       请求报头,也就是原始服务器的域名(有代理服务器时会有用)
+                                        这里必须有一个回车 来表示请求报头结束
+HTTP/1.1 200  OK                        服务器: 服务器返回的响应头:  HTTP版本 状态码 描述
+Date: Thu, 26 Sep 2019 10:40:59 GMT     服务器: 除http外,下面所有行都是服务器返回的响应报头
+Connection: keep-alive                       
+Server: ATS                                 使用的服务器型号
+Cache-Control: no-store
+Content-Type: text/html                     服务器返回内容的 MIME类型
+Content-Language: en                         返回HTML 的语言,就是英语
+Location: https://www.aol.com/               返回的HTML 文件所在的位置(就是域名/位置)
+Content-Length: 3144                         响应主体的大小为3144字节(就是HTML文件的大小)
+                                        这个空行表示响应报头终止
+<html>                                从这里开始是 响应主体
+...
+</html>                               响应主体结束
+Connection closed by foreign host.      关闭连接
+```
+
+* 服务器响应头返回的一些常见的**状态码**
+  * **200**
+    * **成功**,  处理请求无误
+  * **301**
+    * **永久移动**.   内容已经移动到 location 头中指明的主机上
+  * **400**
+    * **错误请求**.  服务器不能理解的请求
+  * **403**
+    * **禁止**.   服务器无权访问所请求的文件
+  * **404**
+    * **未发现.** 服务器不能找到所请求的文件
+  * **501**
+    * **未发现.**  服务器不支持请求的方法
+  * **505**
+    * **HTTP版本不支持.**   服务器不支持请求的版本**.**
+
+### 服务动态内容
+
+**`CGI`\(通用网关接口\)标准解决了如下问题:**
+
+* 客户端 如何将程序参数传递给服务器?
+  * 客户端通过URL来访问服务器.   
+    * **`http://www.pp.com/a.out?113&443`**  
+    * 113 和 443 就是程序 a.out 的参数.
+* 服务器如何将这些参数传递给它所创建的子进程?
+* 服务器如何将子进程生成内容所需要的其他信息传递给子进程?
+* 子进程将它的输出发送到哪里?
+
+#### 1. 客户端如何将程序参数传递给服务器
+
+GET请求的参数在 URI 中传递.  一个 "**`?`**" 字符分隔了文件名和参数, 而每个参数都用一个"**`&`**"字符分隔开. 参数中不允许带有空格, 而必须用字符串"**`%20`**" 来表示. 对其他字符 也有相似的编码.
+
+#### 2. 服务器如何将参数传递给子进程
+
+在服务器收到这条请求行后:  **`GET /cgi-bin/adder?15000&213  HTTP/1.1`**
+
+* **它调用  `fork()` 来创建子进程.**
+* **并且调用 `execve()` 在子进程的上下文中执行 `/cgi-bin/adder` 程序.**
+  * `像 adder 这种程序常常被称为`  **`CGI程序.`**`因为它们遵守CGI标准的规则.`
+    * 因为许多 CGI程序都是用 Perl 脚本写的. 所以CGI程序也常被称为 CGI脚本.
+* 调用 **`execve()`** 之前,  **子进程将** `CGI环境变量`  **`QUERY_STRING`** 设置为 **`"15000&213",`**\(仅限这个范例程序\)
+  * **fork\(\)**之后, 子进程执行的内容:   **`setenv("QUERY_STRING","15000 213",1);`**
+  * 在 **adder** 程序执行时,可以使用 **`getenv`**函数引用它:   **`char buf[1024] = getenv("QUERY_STRING");`**
+
+#### 3. 服务器如何将其他信息传递给子进程
+
+CGI定义了大量的其他环境变量, 一个CGI程序在运行时可以设置这些环境变量
+
+* **QUERY\_STRING**
+  * `程序参数,  (例如 "15000 213")`
+* **SERVER\_PORT**
+  * `父进程侦听的端口`
+* **REQUEST\_METHOD**
+  * `GET 或 POST`
+* **REMOTE\_HOST**
+  * `客户端的域名`
+* **REMOTE\_ADDR**
+  * `客户端的点分十进制IP地址`
+* **CONTENT\_TYPE**
+  * `只对 POST 而言:  请求体的 MIME类型`
+* **CONTENT\_LENGTH**
+  * `只对 POST 而言: 请求体的字节大小`
+
+#### 4. 子进程将它的输出发送到哪里
+
+**一个CGI 程序将它的动态内容发送到标准输出.**
+
+{% hint style="info" %}
+子进程在加载并运行CGI程序之前 \(就是 execve函数之前\) 使用 dup2 函数将标准输出重定向到和客户端相关联的已连接描述符, 因此任何 CGI 程序写到标准输出的东西都会直达客户端.
+
+注意:  因为父进程不知道子进程生成的内容类型或大小, 所以子进程要负责生成 **`Content-type (MIME类型)`**和 **`Content-length (响应主体大小)`** 响应报头, 以及终止报头的空行.
+{% endhint %}
+
+```c
+一个简单的 CGI程序, 他对两个参数求和,并带回结果的 HTML文件给客户端.
+    在此之前,服务器程序以及设置了环境变量和重定位了 STDOUT_FILENO 描述符.
+服务器运行下面程序之前执行的一部分代码
+    if( fork() == 0)
+    {
+        setenv("QUERY_STRING", "15000 213", 1);
+        dup2(和客户端通讯的套接字描述符, STDOUT_FILENO );
+        execve( "./a.out" ,emptylist, environ);
+        /*  下面这个程序名是  a.out
+              emptylist : 是 char* emptylist[] 数组,包含执行 a.out时的参数(不是运行)
+              environ   : 全局环境变量列表 ,这个参数是固定的, 
+    }
+
+/* CGI 程序    a.out  */
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define  MAXLINE  4096
+
+int main(void) {
+    char *buf, *p;
+    char arg1[MAXLINE], arg2[MAXLINE], content[MAXLINE];
+    int n1=0, n2=0;
+
+    /* Extract the two arguments */
+    if ((buf = getenv("QUERY_STRING")) != NULL) {
+	p = strchr(buf, '&');
+	*p = '\0';
+	strcpy(arg1, buf);
+	strcpy(arg2, p+1);
+	n1 = atoi(arg1);
+	n2 = atoi(arg2);
+    }
+
+    /* Make the response body */
+    sprintf(content, "Welcome to add.com: ");
+    sprintf(content, "%sTHE Internet addition portal.\r\n<p>", content);
+    sprintf(content, "%sThe answer is: %d + %d = %d\r\n<p>", 
+	    content, n1, n2, n1 + n2);
+    sprintf(content, "%sThanks for visiting!\r\n", content);
+  
+    /* Generate the HTTP response */
+    printf("Connection: close\r\n");
+    printf("Content-length: %d\r\n", (int)strlen(content));
+    printf("Content-type: text/html\r\n\r\n");
+    printf("%s", content);
+    fflush(stdout);
+
+    exit(0);
+}
+```
+
+### 综合  :  TINY Web 服务器
+
+个人研究完了, 不想把笔记写的乱七八糟, 就直接复制源码了.  一共三个源码文件.
+
+{% code-tabs %}
+{% code-tabs-item title="main.c" %}
+```c
+/* $begin tinymain */
+/*
+ * tiny.c - A simple, iterative HTTP/1.0 Web server that uses the 
+ *     GET method to serve static and dynamic content.
+ */
+#include "csapp.h"
+
+struct sockaddr_in a;
+
+
+void doit(int fd);
+void read_requesthdrs(rio_t *rp);
+int parse_uri(char *uri, char *filename, char *cgiargs);
+void serve_static(int fd, char *filename, int filesize);
+void get_filetype(char *filename, char *filetype);
+void serve_dynamic(int fd, char *filename, char *cgiargs);
+void clienterror(int fd, char *cause, char *errnum, 
+        char *shortmsg, char *longmsg);
+
+int main(int argc, char **argv) 
+{
+    int listenfd, connfd;
+    char hostname[MAXLINE], port[MAXLINE];
+    socklen_t clientlen;
+    struct sockaddr_storage clientaddr;
+
+    /* Check command line args */
+    if (argc != 2) {
+        fprintf(stderr, "usage: %s <port>\n", argv[0]);
+        exit(1);
+    }
+
+    listenfd = Open_listenfd(argv[1]);
+    while (1) {
+        clientlen = sizeof(clientaddr);
+        connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen); //line:netp:tiny:accept
+        Getnameinfo((SA *) &clientaddr, clientlen, hostname, MAXLINE, 
+                port, MAXLINE, 0);
+        printf("Accepted connection from (%s, %s)\n", hostname, port);
+        doit(connfd);                                             //line:netp:tiny:doit
+        Close(connfd);                                            //line:netp:tiny:close
+    }
+}
+/* $end tinymain */
+
+/*
+ * doit - handle one HTTP request/response transaction
+ */
+/* $begin doit */
+void doit(int fd) 
+{
+    int is_static;
+    struct stat sbuf;
+    char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
+    char filename[MAXLINE], cgiargs[MAXLINE];
+    rio_t rio;
+
+    /* Read request line and headers */
+    Rio_readinitb(&rio, fd);
+    if (!Rio_readlineb(&rio, buf, MAXLINE))  //line:netp:doit:readrequest
+        return;
+    printf("%s", buf);
+    sscanf(buf, "%s %s %s", method, uri, version);       //line:netp:doit:parserequest
+    if (strcasecmp(method, "GET")) {                     //line:netp:doit:beginrequesterr
+        clienterror(fd, method, "501", "Not Implemented",
+                "Tiny does not implement this method");
+        return;
+    }                                                    //line:netp:doit:endrequesterr
+    read_requesthdrs(&rio);                              //line:netp:doit:readrequesthdrs
+
+    /* Parse URI from GET request */
+    is_static = parse_uri(uri, filename, cgiargs);       //line:netp:doit:staticcheck
+    if (stat(filename, &sbuf) < 0) {                     //line:netp:doit:beginnotfound
+        clienterror(fd, filename, "404", "Not found",
+                "Tiny couldn't find this file");
+        return;
+    }                                                    //line:netp:doit:endnotfound
+
+    if (is_static) { /* Serve static content */          
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) { //line:netp:doit:readable
+            clienterror(fd, filename, "403", "Forbidden",
+                    "Tiny couldn't read the file");
+            return;
+        }
+        serve_static(fd, filename, sbuf.st_size);        //line:netp:doit:servestatic
+    }
+    else { /* Serve dynamic content */
+        if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) { //line:netp:doit:executable
+            clienterror(fd, filename, "403", "Forbidden",
+                    "Tiny couldn't run the CGI program");
+            return;
+        }
+        serve_dynamic(fd, filename, cgiargs);            //line:netp:doit:servedynamic
+    }
+}
+/* $end doit */
+
+/*
+ * read_requesthdrs - read HTTP request headers
+ */
+/* $begin read_requesthdrs */
+void read_requesthdrs(rio_t *rp) 
+{
+    char buf[MAXLINE];
+
+    Rio_readlineb(rp, buf, MAXLINE);
+    printf("%s", buf);
+    while(strcmp(buf, "\r\n")) {          //line:netp:readhdrs:checkterm
+        Rio_readlineb(rp, buf, MAXLINE);
+        printf("%s", buf);
+    }
+    return;
+}
+/* $end read_requesthdrs */
+
+/*
+ * parse_uri - parse URI into filename and CGI args
+ *             return 0 if dynamic content, 1 if static
+ */
+/* $begin parse_uri */
+int parse_uri(char *uri, char *filename, char *cgiargs) 
+{
+    char *ptr;
+
+    if (!strstr(uri, "cgi-bin")) {  /* Static content */ //line:netp:parseuri:isstatic
+        strcpy(cgiargs, "");                             //line:netp:parseuri:clearcgi
+        strcpy(filename, ".");                           //line:netp:parseuri:beginconvert1
+        strcat(filename, uri);                           //line:netp:parseuri:endconvert1
+        if (uri[strlen(uri)-1] == '/')                   //line:netp:parseuri:slashcheck
+            strcat(filename, "home.html");               //line:netp:parseuri:appenddefault
+        return 1;
+    }
+    else {  /* Dynamic content */                        //line:netp:parseuri:isdynamic
+        ptr = index(uri, '?');                           //line:netp:parseuri:beginextract
+        if (ptr) {
+            strcpy(cgiargs, ptr+1);
+            *ptr = '\0';
+        }
+        else 
+            strcpy(cgiargs, "");                         //line:netp:parseuri:endextract
+        strcpy(filename, ".");                           //line:netp:parseuri:beginconvert2
+        strcat(filename, uri);                           //line:netp:parseuri:endconvert2
+        return 0;
+    }
+}
+/* $end parse_uri */
+
+/*
+ * serve_static - copy a file back to the client 
+ */
+/* $begin serve_static */
+void serve_static(int fd, char *filename, int filesize) 
+{
+    int srcfd;
+    char *srcp, filetype[MAXLINE], buf[MAXBUF];
+
+    /* Send response headers to client */
+    get_filetype(filename, filetype);       //line:netp:servestatic:getfiletype
+    sprintf(buf, "HTTP/1.0 200 OK\r\n");    //line:netp:servestatic:beginserve
+    sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+    sprintf(buf, "%sConnection: close\r\n", buf);
+    sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
+    sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
+    Rio_writen(fd, buf, strlen(buf));       //line:netp:servestatic:endserve
+    printf("Response headers:\n");
+    printf("%s", buf);
+
+    /* Send response body to client */
+    srcfd = Open(filename, O_RDONLY, 0);    //line:netp:servestatic:open
+    srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);//line:netp:servestatic:mmap
+    Close(srcfd);                           //line:netp:servestatic:close
+    Rio_writen(fd, srcp, filesize);         //line:netp:servestatic:write
+    Munmap(srcp, filesize);                 //line:netp:servestatic:munmap
+}
+
+/*
+ * get_filetype - derive file type from file name
+ */
+void get_filetype(char *filename, char *filetype) 
+{
+    if (strstr(filename, ".html"))
+        strcpy(filetype, "text/html");
+    else if (strstr(filename, ".gif"))
+        strcpy(filetype, "image/gif");
+    else if (strstr(filename, ".png"))
+        strcpy(filetype, "image/png");
+    else if (strstr(filename, ".jpg"))
+        strcpy(filetype, "image/jpeg");
+    else
+        strcpy(filetype, "text/plain");
+}  
+/* $end serve_static */
+
+/*
+ * serve_dynamic - run a CGI program on behalf of the client
+ */
+/* $begin serve_dynamic */
+void serve_dynamic(int fd, char *filename, char *cgiargs) 
+{
+    char buf[MAXLINE], *emptylist[] = { NULL };
+
+    /* Return first part of HTTP response */
+    sprintf(buf, "HTTP/1.0 200 OK\r\n"); 
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Server: Tiny Web Server\r\n");
+    Rio_writen(fd, buf, strlen(buf));
+
+    if (Fork() == 0) { /* Child */ //line:netp:servedynamic:fork
+        /* Real server would set all CGI vars here */
+        setenv("QUERY_STRING", cgiargs, 1); //line:netp:servedynamic:setenv
+        Dup2(fd, STDOUT_FILENO);         /* Redirect stdout to client */ //line:netp:servedynamic:dup2
+        Execve(filename, emptylist, environ); /* Run CGI program */ //line:netp:servedynamic:execve
+    }
+    Wait(NULL); /* Parent waits for and reaps child */ //line:netp:servedynamic:wait
+}
+/* $end serve_dynamic */
+
+/*
+ * clienterror - returns an error message to the client
+ */
+/* $begin clienterror */
+void clienterror(int fd, char *cause, char *errnum, 
+        char *shortmsg, char *longmsg) 
+{
+    char buf[MAXLINE], body[MAXBUF];
+
+    /* Build the HTTP response body */
+    sprintf(body, "<html><title>Tiny Error</title>");
+    sprintf(body, "%s<body bgcolor=""ffffff"">\r\n", body);
+    sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
+    sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
+    sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+
+    /* Print the HTTP response */
+    sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-type: text/html\r\n");
+    Rio_writen(fd, buf, strlen(buf));
+    sprintf(buf, "Content-length: %d\r\n\r\n", (int)strlen(body));
+    Rio_writen(fd, buf, strlen(buf));
+    Rio_writen(fd, body, strlen(body));
+}
+/* $end clienterror */
+
+
+```
+{% endcode-tabs-item %}
+
+{% code-tabs-item title="csapp.c" %}
+```c
+/* 
+ * Updated 8/14 droh: 
+ *   - open_clientfd and open_listenfd are now reentrant and protocol
+ *     independent.
+ *
+ *   - Added protocol-independent inet_ntop and inet_pton functions. The
+ *     inet_ntoa and inet_aton functions are obsolete.
+ *
+ * Updated 7/14 droh:
+ *   - Aded reentrant sio (signal-safe I/O) routines
+ * 
+ * Updated 4/13 droh: 
+ *   - rio_readlineb: fixed edge case bug
+ *   - rio_readnb: removed redundant EINTR check
+ */
+/* $begin csapp.c */
+#include "csapp.h"
+
+/************************** 
+ * Error-handling functions
+ **************************/
+/* $begin errorfuns */
+/* $begin unixerror */
+void unix_error(char *msg) /* Unix-style error */
+{
+    fprintf(stderr, "%s: %s\n", msg, strerror(errno));
+    exit(0);
+}
+/* $end unixerror */
+
+void posix_error(int code, char *msg) /* Posix-style error */
+{
+    fprintf(stderr, "%s: %s\n", msg, strerror(code));
+    exit(0);
+}
+
+void dns_error(char *msg)
+{
+    fprintf(stderr, "%s\n", msg);
+    exit(0);
+}
+
+void gai_error(int code, char *msg) /* Getaddrinfo-style error */
+{
+    fprintf(stderr, "%s: %s\n", msg, gai_strerror(code));
+    exit(0);
+}
+
+void app_error(char *msg) /* Application error */
+{
+    fprintf(stderr, "%s\n", msg);
+    exit(0);
+}
+/* $end errorfuns */
+
+/*********************************************
+ * Wrappers for Unix process control functions
+ ********************************************/
+
+/* $begin forkwrapper */
+pid_t Fork(void) 
+{
+    pid_t pid;
+
+    if ((pid = fork()) < 0)
+        unix_error("Fork error");
+    return pid;
+}
+/* $end forkwrapper */
+
+void Execve(const char *filename, char *const argv[], char *const envp[]) 
+{
+    if (execve(filename, argv, envp) < 0)
+        unix_error("Execve error");
+}
+
+/* $begin wait */
+pid_t Wait(int *status) 
+{
+    pid_t pid;
+
+    if ((pid  = wait(status)) < 0)
+        unix_error("Wait error");
+    return pid;
+}
+/* $end wait */
+
+pid_t Waitpid(pid_t pid, int *iptr, int options) 
+{
+    pid_t retpid;
+
+    if ((retpid  = waitpid(pid, iptr, options)) < 0) 
+        unix_error("Waitpid error");
+    return(retpid);
+}
+
+/* $begin kill */
+void Kill(pid_t pid, int signum) 
+{
+    int rc;
+
+    if ((rc = kill(pid, signum)) < 0)
+        unix_error("Kill error");
+}
+/* $end kill */
+
+void Pause() 
+{
+    (void)pause();
+    return;
+}
+
+unsigned int Sleep(unsigned int secs) 
+{
+    unsigned int rc;
+
+    if ((rc = sleep(secs)) < 0)
+        unix_error("Sleep error");
+    return rc;
+}
+
+unsigned int Alarm(unsigned int seconds) {
+    return alarm(seconds);
+}
+
+void Setpgid(pid_t pid, pid_t pgid) {
+    int rc;
+
+    if ((rc = setpgid(pid, pgid)) < 0)
+        unix_error("Setpgid error");
+    return;
+}
+
+pid_t Getpgrp(void) {
+    return getpgrp();
+}
+
+/************************************
+ * Wrappers for Unix signal functions 
+ ***********************************/
+
+/* $begin sigaction */
+handler_t *Signal(int signum, handler_t *handler) 
+{
+    struct sigaction action, old_action;
+
+    action.sa_handler = handler;  
+    sigemptyset(&action.sa_mask); /* Block sigs of type being handled */
+    action.sa_flags = SA_RESTART; /* Restart syscalls if possible */
+
+    if (sigaction(signum, &action, &old_action) < 0)
+        unix_error("Signal error");
+    return (old_action.sa_handler);
+}
+/* $end sigaction */
+
+void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+    if (sigprocmask(how, set, oldset) < 0)
+        unix_error("Sigprocmask error");
+    return;
+}
+
+void Sigemptyset(sigset_t *set)
+{
+    if (sigemptyset(set) < 0)
+        unix_error("Sigemptyset error");
+    return;
+}
+
+void Sigfillset(sigset_t *set)
+{ 
+    if (sigfillset(set) < 0)
+        unix_error("Sigfillset error");
+    return;
+}
+
+void Sigaddset(sigset_t *set, int signum)
+{
+    if (sigaddset(set, signum) < 0)
+        unix_error("Sigaddset error");
+    return;
+}
+
+void Sigdelset(sigset_t *set, int signum)
+{
+    if (sigdelset(set, signum) < 0)
+        unix_error("Sigdelset error");
+    return;
+}
+
+int Sigismember(const sigset_t *set, int signum)
+{
+    int rc;
+    if ((rc = sigismember(set, signum)) < 0)
+        unix_error("Sigismember error");
+    return rc;
+}
+
+int Sigsuspend(const sigset_t *set)
+{
+    int rc = sigsuspend(set); /* always returns -1 */
+    if (errno != EINTR)
+        unix_error("Sigsuspend error");
+    return rc;
+}
+
+/*************************************************************
+ * The Sio (Signal-safe I/O) package - simple reentrant output
+ * functions that are safe for signal handlers.
+ *************************************************************/
+
+/* Private sio functions */
+
+/* $begin sioprivate */
+/* sio_reverse - Reverse a string (from K&R) */
+static void sio_reverse(char s[])
+{
+    int c, i, j;
+
+    for (i = 0, j = strlen(s)-1; i < j; i++, j--) {
+        c = s[i];
+        s[i] = s[j];
+        s[j] = c;
+    }
+}
+
+/* sio_ltoa - Convert long to base b string (from K&R) */
+static void sio_ltoa(long v, char s[], int b) 
+{
+    int c, i = 0;
+
+    do {  
+        s[i++] = ((c = (v % b)) < 10)  ?  c + '0' : c - 10 + 'a';
+    } while ((v /= b) > 0);
+    s[i] = '\0';
+    sio_reverse(s);
+}
+
+/* sio_strlen - Return length of string (from K&R) */
+static size_t sio_strlen(char s[])
+{
+    int i = 0;
+
+    while (s[i] != '\0')
+        ++i;
+    return i;
+}
+/* $end sioprivate */
+
+/* Public Sio functions */
+/* $begin siopublic */
+
+ssize_t sio_puts(char s[]) /* Put string */
+{
+    return write(STDOUT_FILENO, s, sio_strlen(s)); //line:csapp:siostrlen
+}
+
+ssize_t sio_putl(long v) /* Put long */
+{
+    char s[128];
+
+    sio_ltoa(v, s, 10); /* Based on K&R itoa() */  //line:csapp:sioltoa
+    return sio_puts(s);
+}
+
+void sio_error(char s[]) /* Put error message and exit */
+{
+    sio_puts(s);
+    _exit(1);                                      //line:csapp:sioexit
+}
+/* $end siopublic */
+
+/*******************************
+ * Wrappers for the SIO routines
+ ******************************/
+ssize_t Sio_putl(long v)
+{
+    ssize_t n;
+
+    if ((n = sio_putl(v)) < 0)
+        sio_error("Sio_putl error");
+    return n;
+}
+
+ssize_t Sio_puts(char s[])
+{
+    ssize_t n;
+
+    if ((n = sio_puts(s)) < 0)
+        sio_error("Sio_puts error");
+    return n;
+}
+
+void Sio_error(char s[])
+{
+    sio_error(s);
+}
+
+/********************************
+ * Wrappers for Unix I/O routines
+ ********************************/
+
+int Open(const char *pathname, int flags, mode_t mode) 
+{
+    int rc;
+
+    if ((rc = open(pathname, flags, mode))  < 0)
+        unix_error("Open error");
+    return rc;
+}
+
+ssize_t Read(int fd, void *buf, size_t count) 
+{
+    ssize_t rc;
+
+    if ((rc = read(fd, buf, count)) < 0) 
+        unix_error("Read error");
+    return rc;
+}
+
+ssize_t Write(int fd, const void *buf, size_t count) 
+{
+    ssize_t rc;
+
+    if ((rc = write(fd, buf, count)) < 0)
+        unix_error("Write error");
+    return rc;
+}
+
+off_t Lseek(int fildes, off_t offset, int whence) 
+{
+    off_t rc;
+
+    if ((rc = lseek(fildes, offset, whence)) < 0)
+        unix_error("Lseek error");
+    return rc;
+}
+
+void Close(int fd) 
+{
+    int rc;
+
+    if ((rc = close(fd)) < 0)
+        unix_error("Close error");
+}
+
+int Select(int  n, fd_set *readfds, fd_set *writefds,
+        fd_set *exceptfds, struct timeval *timeout) 
+{
+    int rc;
+
+    if ((rc = select(n, readfds, writefds, exceptfds, timeout)) < 0)
+        unix_error("Select error");
+    return rc;
+}
+
+int Dup2(int fd1, int fd2) 
+{
+    int rc;
+
+    if ((rc = dup2(fd1, fd2)) < 0)
+        unix_error("Dup2 error");
+    return rc;
+}
+
+void Stat(const char *filename, struct stat *buf) 
+{
+    if (stat(filename, buf) < 0)
+        unix_error("Stat error");
+}
+
+void Fstat(int fd, struct stat *buf) 
+{
+    if (fstat(fd, buf) < 0)
+        unix_error("Fstat error");
+}
+
+/*********************************
+ * Wrappers for directory function
+ *********************************/
+
+DIR *Opendir(const char *name) 
+{
+    DIR *dirp = opendir(name); 
+
+    if (!dirp)
+        unix_error("opendir error");
+    return dirp;
+}
+
+struct dirent *Readdir(DIR *dirp)
+{
+    struct dirent *dep;
+
+    errno = 0;
+    dep = readdir(dirp);
+    if ((dep == NULL) && (errno != 0))
+        unix_error("readdir error");
+    return dep;
+}
+
+int Closedir(DIR *dirp) 
+{
+    int rc;
+
+    if ((rc = closedir(dirp)) < 0)
+        unix_error("closedir error");
+    return rc;
+}
+
+/***************************************
+ * Wrappers for memory mapping functions
+ ***************************************/
+void *Mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset) 
+{
+    void *ptr;
+
+    if ((ptr = mmap(addr, len, prot, flags, fd, offset)) == ((void *) -1))
+        unix_error("mmap error");
+    return(ptr);
+}
+
+void Munmap(void *start, size_t length) 
+{
+    if (munmap(start, length) < 0)
+        unix_error("munmap error");
+}
+
+/***************************************************
+ * Wrappers for dynamic storage allocation functions
+ ***************************************************/
+
+void *Malloc(size_t size) 
+{
+    void *p;
+
+    if ((p  = malloc(size)) == NULL)
+        unix_error("Malloc error");
+    return p;
+}
+
+void *Realloc(void *ptr, size_t size) 
+{
+    void *p;
+
+    if ((p  = realloc(ptr, size)) == NULL)
+        unix_error("Realloc error");
+    return p;
+}
+
+void *Calloc(size_t nmemb, size_t size) 
+{
+    void *p;
+
+    if ((p = calloc(nmemb, size)) == NULL)
+        unix_error("Calloc error");
+    return p;
+}
+
+void Free(void *ptr) 
+{
+    free(ptr);
+}
+
+/******************************************
+ * Wrappers for the Standard I/O functions.
+ ******************************************/
+void Fclose(FILE *fp) 
+{
+    if (fclose(fp) != 0)
+        unix_error("Fclose error");
+}
+
+FILE *Fdopen(int fd, const char *type) 
+{
+    FILE *fp;
+
+    if ((fp = fdopen(fd, type)) == NULL)
+        unix_error("Fdopen error");
+
+    return fp;
+}
+
+char *Fgets(char *ptr, int n, FILE *stream) 
+{
+    char *rptr;
+
+    if (((rptr = fgets(ptr, n, stream)) == NULL) && ferror(stream))
+        app_error("Fgets error");
+
+    return rptr;
+}
+
+FILE *Fopen(const char *filename, const char *mode) 
+{
+    FILE *fp;
+
+    if ((fp = fopen(filename, mode)) == NULL)
+        unix_error("Fopen error");
+
+    return fp;
+}
+
+void Fputs(const char *ptr, FILE *stream) 
+{
+    if (fputs(ptr, stream) == EOF)
+        unix_error("Fputs error");
+}
+
+size_t Fread(void *ptr, size_t size, size_t nmemb, FILE *stream) 
+{
+    size_t n;
+
+    if (((n = fread(ptr, size, nmemb, stream)) < nmemb) && ferror(stream)) 
+        unix_error("Fread error");
+    return n;
+}
+
+void Fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream) 
+{
+    if (fwrite(ptr, size, nmemb, stream) < nmemb)
+        unix_error("Fwrite error");
+}
+
+
+/**************************** 
+ * Sockets interface wrappers
+ ****************************/
+
+int Socket(int domain, int type, int protocol) 
+{
+    int rc;
+
+    if ((rc = socket(domain, type, protocol)) < 0)
+        unix_error("Socket error");
+    return rc;
+}
+
+void Setsockopt(int s, int level, int optname, const void *optval, int optlen) 
+{
+    int rc;
+
+    if ((rc = setsockopt(s, level, optname, optval, optlen)) < 0)
+        unix_error("Setsockopt error");
+}
+
+void Bind(int sockfd, struct sockaddr *my_addr, int addrlen) 
+{
+    int rc;
+
+    if ((rc = bind(sockfd, my_addr, addrlen)) < 0)
+        unix_error("Bind error");
+}
+
+void Listen(int s, int backlog) 
+{
+    int rc;
+
+    if ((rc = listen(s,  backlog)) < 0)
+        unix_error("Listen error");
+}
+
+int Accept(int s, struct sockaddr *addr, socklen_t *addrlen) 
+{
+    int rc;
+
+    if ((rc = accept(s, addr, addrlen)) < 0)
+        unix_error("Accept error");
+    return rc;
+}
+
+void Connect(int sockfd, struct sockaddr *serv_addr, int addrlen) 
+{
+    int rc;
+
+    if ((rc = connect(sockfd, serv_addr, addrlen)) < 0)
+        unix_error("Connect error");
+}
+
+/*******************************
+ * Protocol-independent wrappers
+ *******************************/
+void Getaddrinfo(const char *node, const char *service, 
+        const struct addrinfo *hints, struct addrinfo **res)
+{
+    int rc;
+
+    if ((rc = getaddrinfo(node, service, hints, res)) != 0) 
+        gai_error(rc, "Getaddrinfo error");
+}
+
+void Getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, 
+        size_t hostlen, char *serv, size_t servlen, int flags)
+{
+    int rc;
+
+    if ((rc = getnameinfo(sa, salen, host, hostlen, serv, 
+                    servlen, flags)) != 0) 
+        gai_error(rc, "Getnameinfo error");
+}
+
+void Freeaddrinfo(struct addrinfo *res)
+{
+    freeaddrinfo(res);
+}
+
+void Inet_ntop(int af, const void *src, char *dst, socklen_t size)
+{
+    if (!inet_ntop(af, src, dst, size))
+        unix_error("Inet_ntop error");
+}
+
+void Inet_pton(int af, const char *src, void *dst) 
+{
+    int rc;
+
+    rc = inet_pton(af, src, dst);
+    if (rc == 0)
+        app_error("inet_pton error: invalid dotted-decimal address");
+    else if (rc < 0)
+        unix_error("Inet_pton error");
+}
+
+/*******************************************
+ * DNS interface wrappers. 
+ *
+ * NOTE: These are obsolete because they are not thread safe. Use
+ * getaddrinfo and getnameinfo instead
+ ***********************************/
+
+/* $begin gethostbyname */
+struct hostent *Gethostbyname(const char *name) 
+{
+    struct hostent *p;
+
+    if ((p = gethostbyname(name)) == NULL)
+        dns_error("Gethostbyname error");
+    return p;
+}
+/* $end gethostbyname */
+
+struct hostent *Gethostbyaddr(const char *addr, int len, int type) 
+{
+    struct hostent *p;
+
+    if ((p = gethostbyaddr(addr, len, type)) == NULL)
+        dns_error("Gethostbyaddr error");
+    return p;
+}
+
+/************************************************
+ * Wrappers for Pthreads thread control functions
+ ************************************************/
+
+void Pthread_create(pthread_t *tidp, pthread_attr_t *attrp, 
+        void * (*routine)(void *), void *argp) 
+{
+    int rc;
+
+    if ((rc = pthread_create(tidp, attrp, routine, argp)) != 0)
+        posix_error(rc, "Pthread_create error");
+}
+
+void Pthread_cancel(pthread_t tid) {
+    int rc;
+
+    if ((rc = pthread_cancel(tid)) != 0)
+        posix_error(rc, "Pthread_cancel error");
+}
+
+void Pthread_join(pthread_t tid, void **thread_return) {
+    int rc;
+
+    if ((rc = pthread_join(tid, thread_return)) != 0)
+        posix_error(rc, "Pthread_join error");
+}
+
+/* $begin detach */
+void Pthread_detach(pthread_t tid) {
+    int rc;
+
+    if ((rc = pthread_detach(tid)) != 0)
+        posix_error(rc, "Pthread_detach error");
+}
+/* $end detach */
+
+void Pthread_exit(void *retval) {
+    pthread_exit(retval);
+}
+
+pthread_t Pthread_self(void) {
+    return pthread_self();
+}
+
+void Pthread_once(pthread_once_t *once_control, void (*init_function)()) {
+    pthread_once(once_control, init_function);
+}
+
+/*******************************
+ * Wrappers for Posix semaphores
+ *******************************/
+
+void Sem_init(sem_t *sem, int pshared, unsigned int value) 
+{
+    if (sem_init(sem, pshared, value) < 0)
+        unix_error("Sem_init error");
+}
+
+void P(sem_t *sem) 
+{
+    if (sem_wait(sem) < 0)
+        unix_error("P error");
+}
+
+void V(sem_t *sem) 
+{
+    if (sem_post(sem) < 0)
+        unix_error("V error");
+}
+
+/****************************************
+ * The Rio package - Robust I/O functions
+ ****************************************/
+
+/*
+ * rio_readn - Robustly read n bytes (unbuffered)
+ */
+/* $begin rio_readn */
+ssize_t rio_readn(int fd, void *usrbuf, size_t n) 
+{
+    size_t nleft = n;
+    ssize_t nread;
+    char *bufp = usrbuf;
+
+    while (nleft > 0) {
+        if ((nread = read(fd, bufp, nleft)) < 0) {
+            if (errno == EINTR) /* Interrupted by sig handler return */
+                nread = 0;      /* and call read() again */
+            else
+                return -1;      /* errno set by read() */ 
+        } 
+        else if (nread == 0)
+            break;              /* EOF */
+        nleft -= nread;
+        bufp += nread;
+    }
+    return (n - nleft);         /* return >= 0 */
+}
+/* $end rio_readn */
+
+/*
+ * rio_writen - Robustly write n bytes (unbuffered)
+ */
+/* $begin rio_writen */
+ssize_t rio_writen(int fd, void *usrbuf, size_t n) 
+{
+    size_t nleft = n;
+    ssize_t nwritten;
+    char *bufp = usrbuf;
+
+    while (nleft > 0) {
+        if ((nwritten = write(fd, bufp, nleft)) <= 0) {
+            if (errno == EINTR)  /* Interrupted by sig handler return */
+                nwritten = 0;    /* and call write() again */
+            else
+                return -1;       /* errno set by write() */
+        }
+        nleft -= nwritten;
+        bufp += nwritten;
+    }
+    return n;
+}
+/* $end rio_writen */
+
+
+/* 
+ * rio_read - This is a wrapper for the Unix read() function that
+ *    transfers min(n, rio_cnt) bytes from an internal buffer to a user
+ *    buffer, where n is the number of bytes requested by the user and
+ *    rio_cnt is the number of unread bytes in the internal buffer. On
+ *    entry, rio_read() refills the internal buffer via a call to
+ *    read() if the internal buffer is empty.
+ */
+/* $begin rio_read */
+static ssize_t rio_read(rio_t *rp, char *usrbuf, size_t n)
+{
+    int cnt;
+
+    while (rp->rio_cnt <= 0) {  /* Refill if buf is empty */
+        rp->rio_cnt = read(rp->rio_fd, rp->rio_buf, 
+                sizeof(rp->rio_buf));
+        if (rp->rio_cnt < 0) {
+            if (errno != EINTR) /* Interrupted by sig handler return */
+                return -1;
+        }
+        else if (rp->rio_cnt == 0)  /* EOF */
+            return 0;
+        else 
+            rp->rio_bufptr = rp->rio_buf; /* Reset buffer ptr */
+    }
+
+    /* Copy min(n, rp->rio_cnt) bytes from internal buf to user buf */
+    cnt = n;          
+    if (rp->rio_cnt < n)   
+        cnt = rp->rio_cnt;
+    memcpy(usrbuf, rp->rio_bufptr, cnt);
+    rp->rio_bufptr += cnt;
+    rp->rio_cnt -= cnt;
+    return cnt;
+}
+/* $end rio_read */
+
+/*
+ * rio_readinitb - Associate a descriptor with a read buffer and reset buffer
+ */
+/* $begin rio_readinitb */
+void rio_readinitb(rio_t *rp, int fd) 
+{
+    rp->rio_fd = fd;  
+    rp->rio_cnt = 0;  
+    rp->rio_bufptr = rp->rio_buf;
+}
+/* $end rio_readinitb */
+
+/*
+ * rio_readnb - Robustly read n bytes (buffered)
+ */
+/* $begin rio_readnb */
+ssize_t rio_readnb(rio_t *rp, void *usrbuf, size_t n) 
+{
+    size_t nleft = n;
+    ssize_t nread;
+    char *bufp = usrbuf;
+
+    while (nleft > 0) {
+        if ((nread = rio_read(rp, bufp, nleft)) < 0) 
+            return -1;          /* errno set by read() */ 
+        else if (nread == 0)
+            break;              /* EOF */
+        nleft -= nread;
+        bufp += nread;
+    }
+    return (n - nleft);         /* return >= 0 */
+}
+/* $end rio_readnb */
+
+/* 
+ * rio_readlineb - Robustly read a text line (buffered)
+ */
+/* $begin rio_readlineb */
+ssize_t rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen) 
+{
+    int n, rc;
+    char c, *bufp = usrbuf;
+
+    for (n = 1; n < maxlen; n++) { 
+        if ((rc = rio_read(rp, &c, 1)) == 1) {
+            *bufp++ = c;
+            if (c == '\n') {
+                n++;
+                break;
+            }
+        } else if (rc == 0) {
+            if (n == 1) {
+                return 0; /* EOF, no data read */
+            }
+            else {
+                break;    /* EOF, some data was read */
+            }
+        } else
+            return -1;	  /* Error */
+    }
+    *bufp = '\0';
+    return n-1;
+}
+/* $end rio_readlineb */
+
+/**********************************
+ * Wrappers for robust I/O routines
+ **********************************/
+ssize_t Rio_readn(int fd, void *ptr, size_t nbytes) 
+{
+    ssize_t n;
+
+    if ((n = rio_readn(fd, ptr, nbytes)) < 0)
+        unix_error("Rio_readn error");
+    return n;
+}
+
+void Rio_writen(int fd, void *usrbuf, size_t n) 
+{
+    if (rio_writen(fd, usrbuf, n) != n)
+        unix_error("Rio_writen error");
+}
+
+void Rio_readinitb(rio_t *rp, int fd)
+{
+    rio_readinitb(rp, fd);
+} 
+
+ssize_t Rio_readnb(rio_t *rp, void *usrbuf, size_t n) 
+{
+    ssize_t rc;
+
+    if ((rc = rio_readnb(rp, usrbuf, n)) < 0)
+        unix_error("Rio_readnb error");
+    return rc;
+}
+
+ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen) 
+{
+    ssize_t rc;
+
+    if ((rc = rio_readlineb(rp, usrbuf, maxlen)) < 0)
+        unix_error("Rio_readlineb error");
+    return rc;
+} 
+
+/******************************** 
+ * Client/server helper functions
+ ********************************/
+/*
+ * open_clientfd - Open connection to server at <hostname, port> and
+ *     return a socket descriptor ready for reading and writing. This
+ *     function is reentrant and protocol-independent.
+ * 
+ *     On error, returns -1 and sets errno.  
+ */
+/* $begin open_clientfd */
+int open_clientfd(char *hostname, char *port) {
+    int clientfd;
+    struct addrinfo hints, *listp, *p;
+
+    /* Get a list of potential server addresses */
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_socktype = SOCK_STREAM;  /* Open a connection */
+    hints.ai_flags = AI_NUMERICSERV;  /* ... using a numeric port arg. */
+    hints.ai_flags |= AI_ADDRCONFIG;  /* Recommended for connections */
+    Getaddrinfo(hostname, port, &hints, &listp);
+
+    /* Walk the list for one that we can successfully connect to */
+    for (p = listp; p; p = p->ai_next) {
+
+        /* Create the socket descriptor */
+        if ((clientfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) 
+            continue; /* Socket failed, try the next */
+        if (connect(clientfd, p->ai_addr, p->ai_addrlen) != -1) 
+            break; /* Success */
+        Close(clientfd); /* Connect failed, try another */
+    } 
+
+    /* Clean up */
+    Freeaddrinfo(listp);
+    if (!p) /* All connects failed */
+        return -1;
+    else    /* The last connect succeeded */
+        return clientfd;
+}
+/* $end open_clientfd */
+
+/*  
+ * open_listenfd - Open and return a listening socket on port. This
+ *     function is reentrant and protocol-independent.
+ *
+ *     On error, returns -1 and sets errno.
+ */
+/* $begin open_listenfd */
+int open_listenfd(char *port) 
+{
+    struct addrinfo hints, *listp, *p;
+    int listenfd, optval=1;
+
+    /* Get a list of potential server addresses */
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_socktype = SOCK_STREAM;  /* Accept TCP connections */
+    hints.ai_flags = AI_PASSIVE;      /* ... on any IP address */
+    hints.ai_flags |= AI_NUMERICSERV; /* ... using a numeric port arg. */
+    hints.ai_flags |= AI_ADDRCONFIG;  /* Recommended for connections */
+    Getaddrinfo(NULL, port, &hints, &listp);
+
+    /* Walk the list for one that we can bind to */
+    for (p = listp; p; p = p->ai_next) {
+
+        /* Create a socket descriptor */
+        if ((listenfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) < 0) 
+            continue;  /* Socket failed, try the next */
+
+        /* Eliminates "Address already in use" error from bind */
+        Setsockopt(listenfd, SOL_SOCKET, SO_REUSEADDR, 
+                (const void *)&optval , sizeof(int));
+
+        /* Bind the descriptor to the address */
+        if (bind(listenfd, p->ai_addr, p->ai_addrlen) == 0)
+            break; /* Success */
+        Close(listenfd); /* Bind failed, try the next */
+    }
+
+    /* Clean up */
+    Freeaddrinfo(listp);
+    if (!p) /* No address worked */
+        return -1;
+
+    /* Make it a listening socket ready to accept connection requests */
+    if (listen(listenfd, LISTENQ) < 0)
+        return -1;
+    return listenfd;
+}
+/* $end open_listenfd */
+
+/****************************************************
+ * Wrappers for reentrant protocol-independent helpers
+ ****************************************************/
+int Open_clientfd(char *hostname, char *port) 
+{
+    int rc;
+
+    if ((rc = open_clientfd(hostname, port)) < 0) 
+        unix_error("Open_clientfd error");
+    return rc;
+}
+
+int Open_listenfd(char *port) 
+{
+    int rc;
+
+    if ((rc = open_listenfd(port)) < 0)
+        unix_error("Open_listenfd error");
+    return rc;
+}
+
+/* $end csapp.c */
 
 
 
 
 
+```
+{% endcode-tabs-item %}
+
+{% code-tabs-item title="csapp.h" %}
+```c
+/* $begin csapp.h */
+#ifndef __CSAPP_H__
+#define __CSAPP_H__
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
+#include <setjmp.h>
+#include <signal.h>
+#include <dirent.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <errno.h>
+#include <math.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+/* Default file permissions are DEF_MODE & ~DEF_UMASK */
+/* $begin createmasks */
+#define DEF_MODE   S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
+#define DEF_UMASK  S_IWGRP|S_IWOTH
+/* $end createmasks */
+
+/* Simplifies calls to bind(), connect(), and accept() */
+/* $begin sockaddrdef */
+typedef struct sockaddr SA;
+/* $end sockaddrdef */
+
+/* Persistent state for the robust I/O (Rio) package */
+/* $begin rio_t */
+#define RIO_BUFSIZE 8192
+typedef struct {
+    int rio_fd;                /* Descriptor for this internal buf */
+    int rio_cnt;               /* Unread bytes in internal buf */
+    char *rio_bufptr;          /* Next unread byte in internal buf */
+    char rio_buf[RIO_BUFSIZE]; /* Internal buffer */
+} rio_t;
+/* $end rio_t */
+
+/* External variables */
+extern int h_errno;    /* Defined by BIND for DNS errors */ 
+extern char **environ; /* Defined by libc */
+
+/* Misc constants */
+#define	MAXLINE	 8192  /* Max text line length */
+#define MAXBUF   8192  /* Max I/O buffer size */
+#define LISTENQ  1024  /* Second argument to listen() */
+
+/* Our own error-handling functions */
+void unix_error(char *msg);
+void posix_error(int code, char *msg);
+void dns_error(char *msg);
+void gai_error(int code, char *msg);
+void app_error(char *msg);
+
+/* Process control wrappers */
+pid_t Fork(void);
+void Execve(const char *filename, char *const argv[], char *const envp[]);
+pid_t Wait(int *status);
+pid_t Waitpid(pid_t pid, int *iptr, int options);
+void Kill(pid_t pid, int signum);
+unsigned int Sleep(unsigned int secs);
+void Pause(void);
+unsigned int Alarm(unsigned int seconds);
+void Setpgid(pid_t pid, pid_t pgid);
+pid_t Getpgrp();
+
+/* Signal wrappers */
+typedef void handler_t(int);
+handler_t *Signal(int signum, handler_t *handler);
+void Sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
+void Sigemptyset(sigset_t *set);
+void Sigfillset(sigset_t *set);
+void Sigaddset(sigset_t *set, int signum);
+void Sigdelset(sigset_t *set, int signum);
+int Sigismember(const sigset_t *set, int signum);
+int Sigsuspend(const sigset_t *set);
+
+/* Sio (Signal-safe I/O) routines */
+ssize_t sio_puts(char s[]);
+ssize_t sio_putl(long v);
+void sio_error(char s[]);
+
+/* Sio wrappers */
+ssize_t Sio_puts(char s[]);
+ssize_t Sio_putl(long v);
+void Sio_error(char s[]);
+
+/* Unix I/O wrappers */
+int Open(const char *pathname, int flags, mode_t mode);
+ssize_t Read(int fd, void *buf, size_t count);
+ssize_t Write(int fd, const void *buf, size_t count);
+off_t Lseek(int fildes, off_t offset, int whence);
+void Close(int fd);
+int Select(int  n, fd_set *readfds, fd_set *writefds, fd_set *exceptfds, 
+        struct timeval *timeout);
+int Dup2(int fd1, int fd2);
+void Stat(const char *filename, struct stat *buf);
+void Fstat(int fd, struct stat *buf) ;
+
+/* Directory wrappers */
+DIR *Opendir(const char *name);
+struct dirent *Readdir(DIR *dirp);
+int Closedir(DIR *dirp);
+
+/* Memory mapping wrappers */
+void *Mmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset);
+void Munmap(void *start, size_t length);
+
+/* Standard I/O wrappers */
+void Fclose(FILE *fp);
+FILE *Fdopen(int fd, const char *type);
+char *Fgets(char *ptr, int n, FILE *stream);
+FILE *Fopen(const char *filename, const char *mode);
+void Fputs(const char *ptr, FILE *stream);
+size_t Fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+void Fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+
+/* Dynamic storage allocation wrappers */
+void *Malloc(size_t size);
+void *Realloc(void *ptr, size_t size);
+void *Calloc(size_t nmemb, size_t size);
+void Free(void *ptr);
+
+/* Sockets interface wrappers */
+int Socket(int domain, int type, int protocol);
+void Setsockopt(int s, int level, int optname, const void *optval, int optlen);
+void Bind(int sockfd, struct sockaddr *my_addr, int addrlen);
+void Listen(int s, int backlog);
+int Accept(int s, struct sockaddr *addr, socklen_t *addrlen);
+void Connect(int sockfd, struct sockaddr *serv_addr, int addrlen);
+
+/* Protocol independent wrappers */
+void Getaddrinfo(const char *node, const char *service, 
+        const struct addrinfo *hints, struct addrinfo **res);
+void Getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, 
+        size_t hostlen, char *serv, size_t servlen, int flags);
+void Freeaddrinfo(struct addrinfo *res);
+void Inet_ntop(int af, const void *src, char *dst, socklen_t size);
+void Inet_pton(int af, const char *src, void *dst); 
+
+/* DNS wrappers */
+struct hostent *Gethostbyname(const char *name);
+struct hostent *Gethostbyaddr(const char *addr, int len, int type);
+
+/* Pthreads thread control wrappers */
+void Pthread_create(pthread_t *tidp, pthread_attr_t *attrp, 
+        void * (*routine)(void *), void *argp);
+void Pthread_join(pthread_t tid, void **thread_return);
+void Pthread_cancel(pthread_t tid);
+void Pthread_detach(pthread_t tid);
+void Pthread_exit(void *retval);
+pthread_t Pthread_self(void);
+void Pthread_once(pthread_once_t *once_control, void (*init_function)());
+
+/* POSIX semaphore wrappers */
+void Sem_init(sem_t *sem, int pshared, unsigned int value);
+void P(sem_t *sem);
+void V(sem_t *sem);
+
+/* Rio (Robust I/O) package */
+ssize_t rio_readn(int fd, void *usrbuf, size_t n);
+ssize_t rio_writen(int fd, void *usrbuf, size_t n);
+void rio_readinitb(rio_t *rp, int fd); 
+ssize_t	rio_readnb(rio_t *rp, void *usrbuf, size_t n);
+ssize_t	rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen);
+
+/* Wrappers for Rio package */
+ssize_t Rio_readn(int fd, void *usrbuf, size_t n);
+void Rio_writen(int fd, void *usrbuf, size_t n);
+void Rio_readinitb(rio_t *rp, int fd); 
+ssize_t Rio_readnb(rio_t *rp, void *usrbuf, size_t n);
+ssize_t Rio_readlineb(rio_t *rp, void *usrbuf, size_t maxlen);
+
+/* Reentrant protocol-independent client/server helpers */
+int open_clientfd(char *hostname, char *port);
+int open_listenfd(char *port);
+
+/* Wrappers for reentrant protocol-independent client/server helpers */
+int Open_clientfd(char *hostname, char *port);
+int Open_listenfd(char *port);
 
 
+#endif /* __CSAPP_H__ */
+/* $end csapp.h */
 
 
-
-
-
-
-
-
-
-
-
-
+```
+{% endcode-tabs-item %}
+{% endcode-tabs %}
 
 
 
