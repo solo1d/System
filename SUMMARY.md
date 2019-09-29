@@ -39,4 +39,5 @@
 * [虚拟内存](xu-ni-nei-cun.md)
 * [系统级 I/O](xi-tong-ji-io.md)
 * [网络编程](wang-luo-bian-cheng.md)
+* [并发编程](bing-fa-bian-cheng.md)
 
