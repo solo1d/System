@@ -96,5 +96,5 @@ linux> gcc -fpic -shared -o  libvector.so  a.c    #生成一个动态库或共�
 
 ## 操作数格式
 
-![&#x64CD;&#x4F5C;&#x6570;&#x683C;&#x5F0F;](.gitbook/assets/ping-mu-kuai-zhao-20190805-14.29.03.png)
+![操作数格式](.gitbook/assets/ping-mu-kuai-zhao-20190805-14.29.03.png)
 

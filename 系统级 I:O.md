@@ -22,7 +22,7 @@
 
 ## Unix I/O
 
-  
+
 一个`Unix 文件`就是一个`m`个字节的序列:
 
 ![](http://i.imgur.com/2gltscx.png)
@@ -78,7 +78,7 @@
 
 Linux内核集那个所有文件都组织成一个目录层次结构,
 
-![](.gitbook/assets/ping-mu-kuai-zhao-20190918-shang-wu-9.28.34.png)
+![jk](.gitbook/assets/ping-mu-kuai-zhao-20190918-shang-wu-9.28.34.png)
 
 **作为其上下文的一部分, 每个进程都有一个当前工作目录, 来确定其 在目录层次结构中的当前位置.**
 
@@ -128,14 +128,15 @@ int open(char *filename,int flags,mode_t mode);
       * `777-022=755` 或者是 `777&~022`。
     * 通过`umask()`函数设置
   * `mode`并不是实际权限
+    
     * 文件的权限位被设置为`mode & ~umask`，也可以表示两者相减。
-  * 例子
-
+* 例子
+  
     ```c
       #define DEF_MODE S_IRUSR|S_IWUSER|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
       //所有人都能读和写
-      #define DEF_UMASK S_IWGRP|S_IWOTH //屏蔽了用户组的写和其他人的写
-
+    #define DEF_UMASK S_IWGRP|S_IWOTH //屏蔽了用户组的写和其他人的写
+  
       umask(DEF_UMASK);
       fd=oepn("foo.txt",O_CREAT|O_TRUNC|O_WRONLY,DEF_MODE);
       //创建了一个新文件，文件的拥有者有读写权利，其他人只有读权限。(屏蔽了用户组的写和其他人的写)
@@ -190,7 +191,7 @@ ssize_t write(int fd,const void *buf,size_t n)
 
 展示了一个程序使用`read`和`write`调用一次一个字节的从`标准输入`拷贝到`标准输出`。
 
-![](http://i.imgur.com/28b8QuN.png)
+![k](http://i.imgur.com/28b8QuN.png)
 
 ![](http://i.imgur.com/2W78uw5.png)
 
@@ -337,12 +338,12 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n)
 
 剩余部分给出大量`RIO`函数的实例。
 
-![](http://i.imgur.com/moWl8ko.png)
+![m](http://i.imgur.com/moWl8ko.png)
 
 * 图10-5展示了一个`读缓冲区`的格式，以及初始化它的`rio_readinitb`的代码。
   * `rio_readinitb`函数创建了一个空的读缓冲区，并且将一个打开的文件描述符与之关联。
 
-![](http://i.imgur.com/7FOjo1V.png)
+![m](http://i.imgur.com/7FOjo1V.png)
 
 * 图10-6所示的`rio_read`函数是RIO读程序的核心。
   * `rio_read`是`Unix read`函数的带缓冲版本。
@@ -357,9 +358,9 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n)
   * 两者的相似性，使得在某些情况也能互相替换。
     * 如后文的`rio_readn`和`rio_readnb`。
 
-![](http://i.imgur.com/gxx93Rv.png)
+![j](http://i.imgur.com/gxx93Rv.png)
 
-![](http://i.imgur.com/MEGxdfn.png)
+![j](http://i.imgur.com/MEGxdfn.png)
 
 ## 读取文件元数据
 
@@ -408,7 +409,7 @@ int fstat(int fd,struct stat *buf);
 
 图10-10展示了如何使用`宏`和`stat`函数来读取和解释
 
-![](http://i.imgur.com/DjwE5hT.png)
+![n](http://i.imgur.com/DjwE5hT.png)
 
 ## 读取目录内容
 
@@ -470,7 +471,7 @@ struct  dirent*  readdir(DIR* dirp);
 
 图10-10展示了如何使用`宏`和`stat`函数来读取和解释
 
-![](http://i.imgur.com/DjwE5hT.png)
+![h](http://i.imgur.com/DjwE5hT.png)
 
 ##  共享文件
 
@@ -499,13 +500,13 @@ struct  dirent*  readdir(DIR* dirp);
 打开文件有三种可能的情形:
 
 **最常见的类型**  
-![](http://i.imgur.com/NTWwK07.png)
+![n](http://i.imgur.com/NTWwK07.png)
 
 * 就是打开两个不同的文件，且文件磁盘位置也不一样。
 * 没有进行**共享**.
 
 **共享情况1**  
-![](http://i.imgur.com/YbMDzzQ.png)
+![b](http://i.imgur.com/YbMDzzQ.png)
 
 * 多个`描述符`也可以通过引用不同的`文件表表项`来引用同一个`文件`。
 * 内容相同，`文件位置`不同\(指向的磁盘位置是同一块\)
@@ -514,7 +515,7 @@ struct  dirent*  readdir(DIR* dirp);
   * 每个`描述符`都有它自己的文件位置，所以对不同`描述符`的读操作可以从文件的不同位置获取数据。
 
 **子父进程共享情况**  
-![](http://i.imgur.com/I9dqQdZ.png)
+![b](http://i.imgur.com/I9dqQdZ.png)
 
 我们也能理解父子进程如何共享文件。
 
@@ -544,7 +545,7 @@ struct  dirent*  readdir(DIR* dirp);
 
 * 使用`dup2`函数
 
-  ```text
+  ```c
     #include<unistd.h>
 
     int dup2(int oldfd,int newfd);
@@ -556,7 +557,7 @@ struct  dirent*  readdir(DIR* dirp);
     * 如果`newfd`已经打开，`dup2`会在拷贝`oldfd`之前关闭`newfd`。\(废话，不是肯定打开吗?\)
     * 也就是说 `newfd` 和 `oldfd` 指向同一个文件表.
 
-![](http://i.imgur.com/dpxhwRt.png)
+![b](http://i.imgur.com/dpxhwRt.png)
 
 > 左边和右边的`hoinkies`
 >
@@ -591,7 +592,7 @@ struct  dirent*  readdir(DIR* dirp);
 
 ## 综合 : 我该使用哪些 I/O 函数?
 
-![](http://i.imgur.com/yWLI3IM.png)
+![v](http://i.imgur.com/yWLI3IM.png)
 
 图总结了我们讨论过的各种`I/O`包。
 

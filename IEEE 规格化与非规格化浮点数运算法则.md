@@ -11,16 +11,16 @@
 #### **将浮点数的为表示划分为三个字段, 分别对这些值进行编码:**
 
 * **一个单独的符号位`s`  直接编码符号`s`.**
-* **`k` 位的阶码字段** ![](.gitbook/assets/ping-mu-kuai-zhao-20190809-09.00.12.png) **编码阶码`E.`\( 参与得到E值的过程运算\)**
-* **`n`位小数字段** ![](.gitbook/assets/ping-mu-kuai-zhao-20190809-09.03.56.png)  **编码尾数 `M`, 但是编码出来的值也依赖于阶码字段是否等于0.**
+* **`k` 位的阶码字段** ![a](.gitbook/assets/ping-mu-kuai-zhao-20190809-09.00.12.png) **编码阶码`E.`\( 参与得到E值的过程运算\)**
+* **`n`位小数字段** ![a](.gitbook/assets/ping-mu-kuai-zhao-20190809-09.03.56.png)  **编码尾数 `M`, 但是编码出来的值也依赖于阶码字段是否等于0.**
 
 ### **单精度32位:  符号字段s=1位,  阶码字段k=8位, 小数字段n=23位**
 
 ### **双精度64位:  符号字段s=1位,  阶码字段k=11位, 小数字段n=52位**
 
-![&#x5B57;&#x6BB5;&#x683C;&#x5F0F;](.gitbook/assets/ping-mu-kuai-zhao-20190809-08.42.09.png)
+![a](.gitbook/assets/ping-mu-kuai-zhao-20190809-08.42.09.png)
 
-![8&#x4F4D;&#x6D6E;&#x70B9;&#x683C;&#x5F0F;&#x975E;&#x8D1F;&#x503C;&#x8868;](.gitbook/assets/ping-mu-kuai-zhao-20190809-09.09.38.png)
+![a](.gitbook/assets/ping-mu-kuai-zhao-20190809-09.09.38.png)
 
 ### 计算公式
 
