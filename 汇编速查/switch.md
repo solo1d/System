@@ -38,7 +38,7 @@ C 代码范例:
     loc_B:    x = x+10;                    /* 102 选项, 没有brack 结尾, index = 2 */
     loc_C:    val = x + 11;  goto done;    /* 103 选项,  index = 3 */
     loc_D:    val = x*x;     goto done;    /* 104 选项,  index = 4 */
-    loc_def:  vla = 0;                     /* default其他值的默认选项,最上面的if会来到这里*/
+    loc_def:  val = 0;                     /* default其他值的默认选项,最上面的if会来到这里*/
     
     done:     *dest = val;     /* 这部分已经不是switch 范围了 */
   }
@@ -59,9 +59,9 @@ C 代码范例:
 /* 执行汇编部分, x是%rdi, n是%rsi, dest是%rdx */
  switch_eg:   
      subq     $100, %rsi      执行 index = n-100;
-     cmpq     $6, %rsi        执行 index:6 重置条件码寄存器
+     cmpq     $6, %rsi        执行 index - 6 重置条件码寄存器
      ja       .L8             如果结果index >6 那么就执行跳转
-     jmp      *.L4(,%rsi,8)   这步很重要  goto *jt[index] ;查看idnex的值,然后计算.
+     jmp      *.L4(,%rsi,8)   这步很重要  goto *jt[index] ;查看idnex的值,然后计算. *表明是间接跳转
   .L3:
       leaq    (%rdi,%rdi,2),%rax     这里是 loc_A
       leaq    (%rdi,%rax,4),%rdi
