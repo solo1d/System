@@ -25,7 +25,7 @@
 
 一个`Unix 文件`就是一个`m`个字节的序列:
 
-![](http://i.imgur.com/2gltscx.png)
+![](.gitbook/assets/2gltscx.png)
 
 * 所有`I/O`设备都被模型化为`文件`。
 * 而所有的输入和输出都被当做相应**文件**的读和写。
@@ -115,7 +115,7 @@ int open(char *filename,int flags,mode_t mode);
 
     ```c
       例子代码
-
+    
       //已只读模式打开一个文件
       fd = Open("foo.txt",O_RDONLY,0);
       //打开一个已存在的文件，并在后面面添加一个数据
@@ -136,7 +136,7 @@ int open(char *filename,int flags,mode_t mode);
       #define DEF_MODE S_IRUSR|S_IWUSER|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH
       //所有人都能读和写
     #define DEF_UMASK S_IWGRP|S_IWOTH //屏蔽了用户组的写和其他人的写
-  
+    
       umask(DEF_UMASK);
       fd=oepn("foo.txt",O_CREAT|O_TRUNC|O_WRONLY,DEF_MODE);
       //创建了一个新文件，文件的拥有者有读写权利，其他人只有读权限。(屏蔽了用户组的写和其他人的写)
@@ -191,9 +191,9 @@ ssize_t write(int fd,const void *buf,size_t n)
 
 展示了一个程序使用`read`和`write`调用一次一个字节的从`标准输入`拷贝到`标准输出`。
 
-![k](http://i.imgur.com/28b8QuN.png)
+![k](.gitbook/assets/28b8QuN.png)
 
-![](http://i.imgur.com/2W78uw5.png)
+![](.gitbook/assets/2W78uw5.png)
 
 通过调用`lseek`函数，应用程序能够显示地修改当前文件的位置
 
@@ -326,7 +326,7 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n)
 
 * 它将描述符`fd`和 **地址`rp`处的一个类型为`rio_t`的读缓冲区**联系起来。
 
-![](http://i.imgur.com/T3iH2Er.png)
+![](.gitbook/assets/T3iH2Er.png)
 
 * `rio_readlineb(&rio,buf,MAXLINE)` 函数
   * `rio_readlineb` 函数从`rio`\(缓冲区\)读出一个文本行\(包括结尾的换行符\)，将它拷贝到存储器位置`buf`，并用`\0`字符结束这个文本行。
@@ -338,12 +338,12 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n)
 
 剩余部分给出大量`RIO`函数的实例。
 
-![m](http://i.imgur.com/moWl8ko.png)
+![m](.gitbook/assets/moWl8ko.png)
 
 * 图10-5展示了一个`读缓冲区`的格式，以及初始化它的`rio_readinitb`的代码。
   * `rio_readinitb`函数创建了一个空的读缓冲区，并且将一个打开的文件描述符与之关联。
 
-![m](http://i.imgur.com/7FOjo1V.png)
+![m](.gitbook/assets/7FOjo1V.png)
 
 * 图10-6所示的`rio_read`函数是RIO读程序的核心。
   * `rio_read`是`Unix read`函数的带缓冲版本。
@@ -358,9 +358,9 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n)
   * 两者的相似性，使得在某些情况也能互相替换。
     * 如后文的`rio_readn`和`rio_readnb`。
 
-![j](http://i.imgur.com/gxx93Rv.png)
+![j](.gitbook/assets/gxx93Rv.png)
 
-![j](http://i.imgur.com/MEGxdfn.png)
+![j](.gitbook/assets/MEGxdfn.png)
 
 ## 读取文件元数据
 
@@ -380,7 +380,7 @@ int fstat(int fd,struct stat *buf);
 	stat 结构体原型：
     struct stat{ 
         dev_t     st_dev;    // 文件的设备编号
-        ino_t     st_ino;    // 节点
+        ino_t     st_ino;    // inode节点, 表示的在磁盘中的位置
         mode_t    st_mode;   // 文件的类型和存取的权限
         nlink_t   st_nlink;  // 连接到该文件的硬链接数目, 刚建立的文件值为1
         uid_t     st_uid;    // 用户ID
@@ -409,7 +409,42 @@ int fstat(int fd,struct stat *buf);
 
 图10-10展示了如何使用`宏`和`stat`函数来读取和解释
 
-![n](http://i.imgur.com/DjwE5hT.png)
+![n](.gitbook/assets/DjwE5hT.png)
+
+```c++
+#include <iostream>
+#include <unistd.h>
+#include <sys/stat.h>
+int main(int argc, const char * argv[]) {
+    
+    int ret = -1;
+    struct stat buf;
+    ret = stat("/Users/ns/Neti.jpg", &buf);
+    if(ret == -1){
+        return errno;
+    }
+    std::cout
+    <<   "buf.st_dev " << buf.st_dev << std::endl
+    <<   "buf.st_blksize " << buf.st_blksize << std::endl
+    <<   "buf.st_blocks " << buf.st_blocks << std::endl
+    <<   "buf.st_flags " << buf.st_flags << std::endl
+    <<   "buf.st_gen " << buf.st_gen << std::endl
+    <<   "buf.st_ino " << buf.st_ino << std::endl
+    <<   "buf.st_nlink " << buf.st_nlink << std::endl
+    <<   "buf.st_mode " << buf.st_mode << std::endl
+    <<   "buf.st_rdev " << buf.st_rdev << std::endl
+    <<   "S_ISREG() " << S_ISREG(buf.st_mode) << std::endl
+    <<   "S_ISREG() " << S_ISDIR(buf.st_mode) << std::endl
+    <<   "S_ISREG() " << S_ISSOCK(buf.st_mode) << std::endl
+    <<   "buf.st_size " << buf.st_size  << std::endl;
+    
+```
+
+
+
+
+
+
 
 ## 读取目录内容
 
@@ -471,7 +506,7 @@ struct  dirent*  readdir(DIR* dirp);
 
 图10-10展示了如何使用`宏`和`stat`函数来读取和解释
 
-![h](http://i.imgur.com/DjwE5hT.png)
+![h](.gitbook/assets/DjwE5hT1.png)
 
 ##  共享文件
 
@@ -500,13 +535,13 @@ struct  dirent*  readdir(DIR* dirp);
 打开文件有三种可能的情形:
 
 **最常见的类型**  
-![n](http://i.imgur.com/NTWwK07.png)
+![n](.gitbook/assets/NTWwK07.png)
 
 * 就是打开两个不同的文件，且文件磁盘位置也不一样。
 * 没有进行**共享**.
 
 **共享情况1**  
-![b](http://i.imgur.com/YbMDzzQ.png)
+![b](.gitbook/assets/YbMDzzQ.png)
 
 * 多个`描述符`也可以通过引用不同的`文件表表项`来引用同一个`文件`。
 * 内容相同，`文件位置`不同\(指向的磁盘位置是同一块\)
@@ -515,7 +550,7 @@ struct  dirent*  readdir(DIR* dirp);
   * 每个`描述符`都有它自己的文件位置，所以对不同`描述符`的读操作可以从文件的不同位置获取数据。
 
 **子父进程共享情况**  
-![b](http://i.imgur.com/I9dqQdZ.png)
+![b](.gitbook/assets/I9dqQdZ.png)
 
 我们也能理解父子进程如何共享文件。
 
@@ -533,7 +568,7 @@ struct  dirent*  readdir(DIR* dirp);
 
 * 例如
 
-  ```text
+  ```bash
     unix> ls > foo.txt
   ```
 
@@ -547,9 +582,9 @@ struct  dirent*  readdir(DIR* dirp);
 
   ```c
     #include<unistd.h>
-
+  
     int dup2(int oldfd,int newfd);
-
+  
                 返回:若成功则为非负的描述符，若出错则为-1
   ```
 
@@ -557,7 +592,7 @@ struct  dirent*  readdir(DIR* dirp);
     * 如果`newfd`已经打开，`dup2`会在拷贝`oldfd`之前关闭`newfd`。\(废话，不是肯定打开吗?\)
     * 也就是说 `newfd` 和 `oldfd` 指向同一个文件表.
 
-![b](http://i.imgur.com/dpxhwRt.png)
+![b](.gitbook/assets/dpxhwRt.png)
 
 > 左边和右边的`hoinkies`
 >
@@ -580,11 +615,11 @@ struct  dirent*  readdir(DIR* dirp);
     * `stdout` 标准输出
     * `stdout` 标准错误
 
-      ```text
-        #include<stdio.h>
-        extern FILE *stdin;
-        extern FILE *stdout;
-        extern FILE *stderr;
+      ```c
+      #include<stdio.h>
+      extern FILE *stdin;
+      extern FILE *stdout;
+      extern FILE *stderr;
       ```
 * 类型为`FILE`的流是对`文件描述符`和`流缓冲区`的抽象。
   * `流缓冲区`的目的和`RIO读缓冲区`的目的一样
@@ -592,7 +627,7 @@ struct  dirent*  readdir(DIR* dirp);
 
 ## 综合 : 我该使用哪些 I/O 函数?
 
-![v](http://i.imgur.com/yWLI3IM.png)
+![v](.gitbook/assets/yWLI3IM.png)
 
 图总结了我们讨论过的各种`I/O`包。
 
@@ -623,7 +658,7 @@ struct  dirent*  readdir(DIR* dirp);
 * 限制二: 跟在输入函数之后的输出函数。
   * 如果中间没有插入对`fseek`,`fsetpos`或者`rewind`的调用，一个输出函数不能跟随在一个输入函数之后，除非该输入函数遇到了一个\`EOF。
 
-![](http://i.imgur.com/4pMtV0z.png)
+![](.gitbook/assets/4pMtV0z.png)
 
 因此，我们建议你在`网络套接字`不要使用`标准I/O`来进行输入和输出。而要使用`RIO 或 unix I/O`
 
